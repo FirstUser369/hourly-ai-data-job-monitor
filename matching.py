@@ -1,0 +1,59 @@
+"""Broad relevance scoring for AI, ML, data, analytics and adjacent engineering work."""
+import re
+
+GROUPS = {
+    "machine learning": (r'\bmachine learning\b|\bdeep learning\b|\bml engineer\b|\bmlops\b|\bmodel serving\b|\bmodel training\b', 5),
+    "generative AI": (r'\b(?:generative ai|genai|llms?|large language models?|rag|retrieval augmented generation|agents?|prompt engineer(?:ing)?)\b', 5),
+    "data engineering": (r'\b(?:data engineer(?:ing)?|data platform|etl|elt|data pipelines?|dbt|spark|databricks|airflow|streaming data|data infrastructure)\b', 5),
+    "AI engineering": (r'\b(?:artificial intelligence|applied ai|ai engineer(?:ing)?|intelligent systems|nlp|natural language processing|computer vision|speech recognition|inference engineer(?:ing)?)\b', 5),
+    "analytics": (r'\b(?:analytics engineer(?:ing)?|data analy(?:st|tics)|product analytics|business intelligence|bi engineer(?:ing)?|decision scientist|experimentation|causal inference)\b', 4),
+    "data science": (r'\b(?:data scien(?:ce|tist)|statistical model(?:ing|ling)|predictive model(?:ing|ling)|forecasting|recommendation systems?)\b', 5),
+}
+TITLE_HINT = re.compile(r'\b(?:engineer|developer|scientist|analyst|researcher|specialist|architect|technologist|programmer|consultant)\b', re.I)
+TECH = re.compile(r'\b(?:python|pytorch|tensorflow|sql|spark|kafka|snowflake|aws|azure|gcp|vector database|llm|mlops|machine learning|etl|dbt|databricks)\b',re.I)
+SENIOR_EXCLUDE = re.compile(r'\b(?:intern(?:ship)?|co.op|staff|principal|director|vice president|vp|head of|chief|distinguished|fellow)\b',re.I)
+YEARS = re.compile(r'(?<!\d)(\d{1,2})(?:\s*[-–]\s*\d{1,2})?\s*\+?\s*(?:years?|yrs?)\b',re.I)
+
+def assess(title, description='', min_score=5):
+    """Return (accepted, score, reasons); title carries strongest weight.
+    Missing years is allowed; seniority evidence is a soft preference.
+    """
+    title=title or ''
+    description=description or ''
+    if SENIOR_EXCLUDE.search(title): return False,0,['excluded seniority/intern']
+    if re.search(r'\b(?:sales representative|account executive|talent acquisition|recruiter|registered nurse|warehouse associate)\b',title,re.I):
+        return False,0,['outside technical target']
+    reasons=[]
+    score=0
+    for group,(pat,points) in GROUPS.items():
+        title_hit=bool(re.search(pat,title,re.I))
+        body_hit=bool(re.search(pat,description[:8000],re.I))
+        if title_hit:
+            score+=points+3; reasons.append(group+' in title')
+        elif body_hit:
+            score+=min(2,points);reasons.append(group+' in description')
+    if not reasons: return False,0,['no relevant AI/data signals']
+    # Avoid emailing every generic software engineering opening with ML in boilerplate.
+    strong_title=any('in title' in reason for reason in reasons)
+    if not strong_title and not (TITLE_HINT.search(title) and len(reasons)>=2 and TECH.search(description)):
+        return False,score,['technical relevance too weak']
+    if TITLE_HINT.search(title): score+=1
+    y=YEARS.search(description[:12000])
+    if y:
+        n=int(y.group(1))
+        if n>=8: score-=3;reasons.append('may require 8+ years')
+        elif 2<=n<=5:score+=2;reasons.append('2–5 years noted')
+        elif n<=1:score+=1;reasons.append('entry-level noted')
+    return score>=min_score,score,reasons
+
+def us_eligible(location='',country=None):
+    location=(location or '').strip()
+    country=str(country or '').strip().upper()
+    if country in ('US','USA','UNITED STATES','UNITED STATES OF AMERICA'): return True
+    if country and country not in ('US','USA','UNITED STATES','UNITED STATES OF AMERICA','WORLDWIDE','GLOBAL'): return False
+    if re.search(r'\b(?:united states|u\\.?s\\.?a?\\.?|us remote|remote us|north america|worldwide|global|anywhere)\b',location,re.I): return True
+    if re.search(r'\b(?:canada|united kingdom|europe|india|germany|france|australia)\b',location,re.I):return False
+    if re.search(r'\b(?:remote|united states)\b',location,re.I):return True
+    if re.search(r',\s*(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MS|MN|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b',location): return True
+    if re.search(r'\b(?:California|Texas|Florida|New York|Massachusetts|Washington|Georgia|Colorado|Illinois|Virginia|Maryland|Pennsylvania|North Carolina|New Jersey|Oregon|Ohio|Arizona|Michigan|Minnesota|Tennessee|Utah|Wisconsin|Connecticut|Missouri|Indiana|Nevada|Atlanta|Boston|Chicago|Seattle|San Francisco|Austin|Dallas|Houston|Denver|Los Angeles|San Diego|Miami|Philadelphia|Phoenix|Raleigh|Portland|Nashville)\b',location,re.I):return True
+    return False
