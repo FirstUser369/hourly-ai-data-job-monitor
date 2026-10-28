@@ -1,8 +1,9 @@
 name: Hourly AI/Data job monitor + career discovery
 on:
   schedule:
-    # Scan employers every hour (UTC); GitHub scheduled runs may be delayed.
-    - cron: '17 * * * *'
+    # Two off-peak triggers each hour reduce missed windows when GitHub delays/drops scheduled events.
+    # Both retain the strict 60-minute publication filter and SQLite deduplication.
+    - cron: '13,43 * * * *'
     # Refresh opt-in employer career-page discovery weekly, then scan.
     - cron: '41 7 * * 0'
   workflow_dispatch:

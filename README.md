@@ -33,7 +33,7 @@ To add more US companies, extend `career_pages.yml` with their official careers 
 
 ## Run and verify
 
-- Actions → **Hourly AI/Data job monitor + career discovery** → Run workflow on `main`. For a manual run choose whether to also discover career pages; otherwise it just scans jobs. Cron scans hourly at minute 17 UTC, with discovery plus scan every Sunday at 07:41 UTC; GitHub may delay scheduled runs. The default branch is monitored.
+- Actions → **Hourly AI/Data job monitor + career discovery** → Run workflow on `main`. For a manual run choose whether to also discover career pages; otherwise it just scans jobs. Cron scans twice hourly at minutes 13 and 43 UTC, with discovery plus scan every Sunday at 07:41 UTC; GitHub may delay scheduled runs. The default branch is monitored.
 - The existing **Send test email** workflow remains separate so SMTP can be tested without changing job history.
 - Download the hourly **scan-report** artifact and inspect `last_run.json`, especially `verified_timestamp_jobs`, `posted_last_60_minutes`, `eligible_seen`, `new_matches`, and `boards_failed`.
 - First successful run after this change reuses the existing saved baseline; no reset.
