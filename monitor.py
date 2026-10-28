@@ -9,7 +9,7 @@ from urllib3.util.retry import Retry
 import requests, yaml
 from bs4 import BeautifulSoup
 from matching import assess, us_eligible
-from extra_sources import remoteok, himalayas
+from extra_sources import remoteok, himalayas, arbeitnow
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
 NOW = datetime.now(timezone.utc)
@@ -77,6 +77,8 @@ def fetch(board):
         yield from remoteok(SESSION)
     elif ats == 'himalayas':
         yield from himalayas(SESSION)
+    elif ats == 'arbeitnow':
+        yield from arbeitnow(SESSION)
     else: raise ValueError(f'Unsupported ATS: {ats}')
 
 def eligible(j):
@@ -124,7 +126,7 @@ def main():
     parser.add_argument('--dry-run',action='store_true')
     args=parser.parse_args()
     boards=yaml.safe_load(Path('boards.yml').read_text(encoding='utf-8'))['boards']
-    dedup={(b['ats'],b['slug']):b for b in boards if b.get('ats') in ('greenhouse','lever','ashby','smartrecruiters','remoteok','himalayas')}
+    dedup={(b['ats'],b['slug']):b for b in boards if b.get('ats') in ('greenhouse','lever','ashby','smartrecruiters','remoteok','himalayas','arbeitnow')}
     boards=list(dedup.values())
     if not boards: raise RuntimeError('No configured boards')
     def check(board):
