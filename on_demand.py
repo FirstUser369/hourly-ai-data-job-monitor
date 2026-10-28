@@ -54,22 +54,30 @@ def assess_new(job, checkpoint, existing):
             previous_published = parse_iso(existing[1]) if existing else None
             if not previous_published or previous_published < posted:
                 return "Published since last run (employer timestamp)"
+    if job.get("ats") == "github_tracker":
+        if existing:
+            return None
+        minutes = job.get("github_reported_age_minutes")
+        if isinstance(minutes, int):
+            if checkpoint and (NOW - checkpoint).total_seconds() < minutes * 60:
+                return None
+            if checkpoint:
+                return "GitHub tracker reports posted since last run (unverified)"
+            return "Current GitHub tracker listing (first run; age source-reported)"
+        if not checkpoint:
+            return "Current GitHub tracker listing (initial run; date unknown)"
+        return "Newly discovered on tracker (posting date unverified)"
     # Newly discovered jobs (not necessarily posted since previous run).
     if existing:
         return None
     if not checkpoint:
         return "Current listing (initial baseline, publication time unknown)"
-    if job.get("ats") == "github_tracker":
-        minutes = job.get("github_reported_age_minutes")
-        if isinstance(minutes, int) and 0 <= minutes < 60:
-            return "Newly discovered; GitHub tracker reports under 60 minutes"
-        return "Newly discovered; GitHub tracker date unverified"
     return "Newly discovered since last run (publication time unknown)"
 
 
 def safe_link(value):
     value = str(value or "")
-    if re.match(r"^https://[^\\s<>]+$", value):
+    if re.match(r"^https://[^\s<>]+$", value):
         return value.replace("|", "%7C").replace(")", "%29")
     return ""
 
