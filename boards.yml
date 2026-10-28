@@ -1,4 +1,6 @@
-# Candidate ATS identifiers, not live-verified. Check validation_report.json after scans.
+# 35 board feeds passed HTTP validation in workflow run 40719518277 on 2026-10-28.
+# API success does not guarantee that each feed currently lists relevant US jobs.
+# Revalidate on each scan; investigate errors before re-adding removed candidates.
 # SmartRecruiters: add {ats: smartrecruiters, slug: VERIFIED_ID, company: Name}
 # Workday: not supported through an official universal public postings API.
 boards:
@@ -8,8 +10,6 @@ boards:
   - {ats: greenhouse, slug: figma, company: "Figma"}
   - {ats: greenhouse, slug: discord, company: "Discord"}
   - {ats: greenhouse, slug: reddit, company: "Reddit"}
-  - {ats: greenhouse, slug: plaid, company: "Plaid"}
-  - {ats: greenhouse, slug: notion, company: "Notion"}
   - {ats: greenhouse, slug: coinbase, company: "Coinbase"}
   - {ats: greenhouse, slug: duolingo, company: "Duolingo"}
   - {ats: greenhouse, slug: robinhood, company: "Robinhood"}
@@ -21,34 +21,21 @@ boards:
   - {ats: greenhouse, slug: brex, company: "Brex"}
   - {ats: greenhouse, slug: scaleai, company: "Scale AI"}
   - {ats: greenhouse, slug: samsara, company: "Samsara"}
-  - {ats: greenhouse, slug: grammarly, company: "Grammarly"}
   - {ats: lever, slug: palantir, company: "Palantir"}
-  - {ats: lever, slug: netflix, company: "Netflix"}
   - {ats: lever, slug: spotify, company: "Spotify"}
-  - {ats: lever, slug: anduril, company: "Anduril"}
-  - {ats: lever, slug: postman, company: "Postman"}
-  - {ats: lever, slug: rippling, company: "Rippling"}
-  - {ats: lever, slug: flexport, company: "Flexport"}
-  - {ats: lever, slug: coursera, company: "Coursera"}
   - {ats: lever, slug: zoox, company: "Zoox"}
-  - {ats: lever, slug: benchling, company: "Benchling"}
   - {ats: ashby, slug: ramp, company: "Ramp"}
   - {ats: ashby, slug: openai, company: "OpenAI"}
-  - {ats: ashby, slug: anthropic, company: "Anthropic"}
   - {ats: ashby, slug: linear, company: "Linear"}
   - {ats: ashby, slug: perplexity, company: "Perplexity"}
   - {ats: ashby, slug: harvey, company: "Harvey"}
   - {ats: ashby, slug: mercury, company: "Mercury"}
   - {ats: ashby, slug: cursor, company: "Cursor"}
   - {ats: ashby, slug: modal, company: "Modal"}
-  - {ats: ashby, slug: retool, company: "Retool"}
   - {ats: ashby, slug: vanta, company: "Vanta"}
   - {ats: ashby, slug: runway, company: "Runway"}
   - {ats: ashby, slug: elevenlabs, company: "ElevenLabs"}
-  - {ats: ashby, slug: glean, company: "Glean"}
   - {ats: ashby, slug: replit, company: "Replit"}
   - {ats: ashby, slug: pinecone, company: "Pinecone"}
-  - {ats: ashby, slug: togetherai, company: "Together AI"}
-  - {ats: ashby, slug: wandb, company: "Weights & Biases"}
   - {ats: ashby, slug: langchain, company: "LangChain"}
   - {ats: ashby, slug: cohere, company: "Cohere"}
