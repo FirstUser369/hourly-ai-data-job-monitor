@@ -6,10 +6,10 @@ GROUPS = {
     "generative AI": (r'\b(?:generative ai|genai|llms?|large language models?|rag|retrieval augmented generation|agents?|prompt engineer(?:ing)?)\b', 5),
     "data engineering": (r'\b(?:data engineer(?:ing)?|data platform|etl|elt|data pipelines?|dbt|spark|databricks|airflow|streaming data|data infrastructure)\b', 5),
     "AI engineering": (r'\b(?:artificial intelligence|applied ai|ai engineer(?:ing)?|intelligent systems|nlp|natural language processing|computer vision|speech recognition|inference engineer(?:ing)?)\b', 5),
-    "analytics": (r'\b(?:analytics engineer(?:ing)?|data analy(?:st|tics)|product analytics|business intelligence|bi engineer(?:ing)?|decision scientist|experimentation|causal inference)\b', 4),
+    "analytics": (r'\b(?:analytics engineer(?:ing)?|data analy(?:st|tics)|product analytics|quantitative analytics|business intelligence|bi engineer(?:ing)?|decision scientist|experimentation|causal inference)\b', 4),
     "data science": (r'\b(?:data scien(?:ce|tist)|statistical model(?:ing|ling)|predictive model(?:ing|ling)|forecasting|recommendation systems?)\b', 5),
 }
-TITLE_HINT = re.compile(r'\b(?:engineer|developer|scientist|analyst|researcher|specialist|architect|technologist|programmer|consultant)\b', re.I)
+TITLE_HINT = re.compile(r'\b(?:engineer|developer|scientist|analyst|researcher|specialist|associate|architect|technologist|programmer|consultant)\b', re.I)
 TECH = re.compile(r'\b(?:python|pytorch|tensorflow|sql|spark|kafka|snowflake|aws|azure|gcp|vector database|llm|mlops|machine learning|etl|dbt|databricks)\b',re.I)
 SENIOR_EXCLUDE = re.compile(r'\b(?:intern(?:ship)?|co.op|staff|principal|director|vice president|vp|head of|chief|distinguished|fellow)\b',re.I)
 YEARS = re.compile(r'(?<!\d)(\d{1,2})(?:\s*[-–]\s*\d{1,2})?\s*\+?\s*(?:years?|yrs?)\b',re.I)
