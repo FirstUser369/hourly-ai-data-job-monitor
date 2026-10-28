@@ -51,7 +51,7 @@ def us_eligible(location='',country=None):
     country=str(country or '').strip().upper()
     if country in ('US','USA','UNITED STATES','UNITED STATES OF AMERICA'): return True
     if country and country not in ('US','USA','UNITED STATES','UNITED STATES OF AMERICA','WORLDWIDE','GLOBAL'): return False
-    if re.search(r'\b(?:united states|u\\.?s\\.?a?\\.?|us remote|remote us|north america|worldwide|global|anywhere)\b',location,re.I): return True
+    if re.search(r'\b(?:united states|u[.]?s[.]?a[.]?|us remote|remote us|north america|worldwide|global|anywhere)\b',location,re.I): return True
     if re.search(r'\b(?:canada|united kingdom|europe|india|germany|france|australia)\b',location,re.I):return False
     if re.search(r'\b(?:remote|united states)\b',location,re.I):return True
     if re.search(r',\s*(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MS|MN|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b',location): return True
