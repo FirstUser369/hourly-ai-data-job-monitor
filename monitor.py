@@ -10,7 +10,6 @@ import requests, yaml
 from bs4 import BeautifulSoup
 from matching import assess, us_eligible
 from extra_sources import remoteok, himalayas, arbeitnow
-from freshness import published_last_hour, timestamp_class
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
 NOW = datetime.now(timezone.utc)
@@ -130,10 +129,10 @@ def send_email(jobs):
         raise RuntimeError('Missing SMTP_HOST, SMTP_USER, SMTP_PASSWORD or ALERT_TO; unsent matches retained')
     msg = EmailMessage()
     msg['From'], msg['To'] = user, recipient
-    msg['Subject'] = f'{len(jobs)} AI/Data jobs published in the last 60 minutes'
-    body = ['Employer-reported publication/release timestamps within the 60 minutes before the scan.', 'Ashby timestamps can represent republications rather than first-ever publication.', 'Listings may already be on LinkedIn or other boards.', '']
+    msg['Subject'] = f'{len(jobs)} new direct-ATS AI/Data engineering matches'
+    body = ['Newly discovered AI, ML, data, analytics and adjacent engineering roles.', 'Discovery time is not publication time. Listings may already be on LinkedIn or Jobright.', 'Non-employer feeds are credited alongside links.', '']
     for j in jobs:
-        body += [f"{j['title']} — {j['company']}",f"Location: {j['location']}",f"First seen (UTC): {j['first_seen']}",f"Employer published (UTC): {j['published'] or 'Unavailable'}",f"Timestamp basis: {j['freshness']}",f"Relevance score: {j.get('score','?')} — {j.get('relevance','')}",f"Source: {j.get('source') or j['ats']}",f"Link: {j['url']}",'']
+        body += [f"{j['title']} — {j['company']}",f"Location: {j['location']}",f"First seen (UTC): {j['first_seen']}",f"Employer published (UTC): {j['published'] or 'Unavailable'}",f"Freshness: {j['freshness']}",f"Relevance score: {j.get('score','?')} — {j.get('relevance','')}",f"Source: {j.get('source') or j['ats']}",f"Link: {j['url']}",'']
     msg.set_content('\n'.join(body))
     port=int(os.getenv('SMTP_PORT','587'))
     if port == 465:
@@ -153,9 +152,6 @@ def main():
     parser.add_argument('--dry-run',action='store_true')
     args=parser.parse_args()
     boards=yaml.safe_load(Path('boards.yml').read_text(encoding='utf-8'))['boards']
-    discovered=Path('discovered_boards.yml')
-    if discovered.exists():
-        boards += (yaml.safe_load(discovered.read_text(encoding='utf-8')) or {}).get('boards',[])
     dedup={(b['ats'],b['slug']):b for b in boards if b.get('ats') in ('greenhouse','lever','ashby','smartrecruiters','remoteok','himalayas','arbeitnow')}
     boards=list(dedup.values())
     if not boards: raise RuntimeError('No configured boards')
@@ -177,8 +173,6 @@ def main():
         initialized=db.execute("SELECT value FROM metadata WHERE key='initialized'").fetchone() is not None
         expansion_ready=db.execute("SELECT value FROM metadata WHERE key='broad_relevance_v1'").fetchone() is not None
         accepted_count=0
-        timestamp_verified=0
-        fresh_count=0
         pending=[]
         for board,found,error in results:
             if error:
@@ -189,12 +183,8 @@ def main():
                 accepted_count+=1
                 key=hashlib.sha256(f"{j['ats']}:{board['slug']}:{j['id']}".encode()).hexdigest()
                 published=j['published']
-                fresh=published_last_hour(j,NOW)
-                if published is not None and j.get('ats') in ('greenhouse','ashby','smartrecruiters'):
-                    timestamp_verified+=1
-                if fresh:
-                    fresh_count+=1
-                classification=timestamp_class(j)
+                fresh=published is not None and timedelta(minutes=-5)<=NOW-published<=timedelta(minutes=60)
+                classification='published_within_60m' if fresh else ('first_discovered_time_unverified' if published is None else 'discovered_after_publication')
                 existing=db.execute('SELECT first_seen,alerted FROM jobs WHERE key=?',(key,)).fetchone()
                 first_seen=existing[0] if existing else iso(NOW)
                 alerted=existing[1] if existing else (1 if initialized and not expansion_ready else 0)
@@ -202,7 +192,7 @@ def main():
                     VALUES(?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(key) DO UPDATE SET company=excluded.company,title=excluded.title,location=excluded.location,url=excluded.url,published=excluded.published,last_seen=excluded.last_seen""",
                     (key,j['company'],j['title'],j['location'],j['url'],iso(published),first_seen,iso(NOW),alerted))
-                if initialized and expansion_ready and not alerted and fresh:
+                if initialized and expansion_ready and not alerted:
                     pending.append(dict(key=key,**j,first_seen=first_seen,freshness=classification))
         if not expansion_ready:
             db.execute("INSERT INTO metadata(key,value) VALUES('broad_relevance_v1',?)",(iso(NOW),))
@@ -212,7 +202,7 @@ def main():
             db.execute('UPDATE jobs SET alerted=1')
         db.commit()
         if not expansion_ready:
-            Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'eligible_seen':accepted_count,'verified_timestamp_jobs':timestamp_verified,'posted_last_60_minutes':fresh_count,'new_matches':0,'baseline':True},indent=2))
+            Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'eligible_seen':accepted_count,'new_matches':0,'baseline':True},indent=2))
             logging.info('Broader relevance baseline established (%s matches); alerts begin with the next run', accepted_count)
             return 0
         # Deduplicate digest, marking every source identity as alerted if delivery succeeds.
@@ -227,8 +217,8 @@ def main():
             completed=[j['key'] for j in pending if (re.sub(r'\W+','',j['company'].lower()),re.sub(r'\W+','',j['title'].lower()),re.sub(r'\W+','',j['location'].lower())) in delivered_signatures]
             db.executemany('UPDATE jobs SET alerted=1 WHERE key=?',[(key,) for key in completed])
             db.commit()
-        Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'new_matches':len(alerts),'eligible_seen':accepted_count,'verified_timestamp_jobs':timestamp_verified,'posted_last_60_minutes':fresh_count,'baseline':not expansion_ready},indent=2))
-        logging.info('%s relevant postings; %s with employer time; %s published in last 60 minutes; %s newly eligible alerts',accepted_count,timestamp_verified,fresh_count,len(alerts))
+        Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'new_matches':len(alerts),'eligible_seen':accepted_count,'baseline':not expansion_ready},indent=2))
+        logging.info('%s eligible postings assessed; %s new matches for this digest', accepted_count,len(alerts))
     finally:
         db.close()
     return 0

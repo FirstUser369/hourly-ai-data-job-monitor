@@ -1,0 +1,19 @@
+# Opt-in company career landing pages. Add employer official careers URLs here.
+# Discovery follows a landing page and finds PUBLIC linked ATS feeds.
+# Many JS-only career pages cannot be discovered automatically.
+companies:
+  - {company: "Stripe", url: "https://stripe.com/jobs"}
+  - {company: "Datadog", url: "https://www.datadoghq.com/careers/"}
+  - {company: "Cloudflare", url: "https://www.cloudflare.com/careers/"}
+  - {company: "Figma", url: "https://www.figma.com/careers/"}
+  - {company: "Discord", url: "https://discord.com/jobs"}
+  - {company: "Coinbase", url: "https://www.coinbase.com/careers"}
+  - {company: "Duolingo", url: "https://careers.duolingo.com/"}
+  - {company: "MongoDB", url: "https://www.mongodb.com/company/careers"}
+  - {company: "Vercel", url: "https://vercel.com/careers"}
+  - {company: "Affirm", url: "https://www.affirm.com/careers"}
+  - {company: "Brex", url: "https://www.brex.com/careers"}
+  - {company: "Ramp", url: "https://ramp.com/careers"}
+  - {company: "OpenAI", url: "https://openai.com/careers/"}
+  - {company: "Replit", url: "https://replit.com/careers"}
+  - {company: "Cohere", url: "https://cohere.com/careers"}
