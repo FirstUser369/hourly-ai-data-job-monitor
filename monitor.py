@@ -8,6 +8,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import requests, yaml
 from bs4 import BeautifulSoup
+from matching import assess, us_eligible
+from extra_sources import remoteok, himalayas
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
 NOW = datetime.now(timezone.utc)
@@ -71,26 +73,17 @@ def fetch(board):
                 yield dict(company=company, ats=ats, id=str(j['id']),title=j.get('name') or j.get('title',''), location=location,description=description,url=j.get('jobAdUrl') or j.get('applyUrl') or j.get('ref',''),published=dateparse(j.get('releasedDate')),updated=None,country=l.get('country'))
             if len(jobs)<100: break
             offset+=100
+    elif ats == 'remoteok':
+        yield from remoteok(SESSION)
+    elif ats == 'himalayas':
+        yield from himalayas(SESSION)
     else: raise ValueError(f'Unsupported ATS: {ats}')
 
 def eligible(j):
-    if not ROLE.search(j['title']) or EXCLUDE.search(j['title']): return False
-    loc = j['location']
-    country = str(j.get('country') or '').upper()
-    if country and country not in ('US','USA','UNITED STATES'): return False
-    if not (country in ('US','USA','UNITED STATES') or STATES.search(loc) or STATE_CODES.search(loc)): return False
-    if re.search(r'\b(?:Canada|India|UK|United Kingdom|Europe|Germany|France|Australia)\b',loc,re.I) and not re.search(r'\b(?:US|USA|United States)\b',loc,re.I): return False
-    # Strict: no experience evidence => no alert. Review ambiguous cases manually.
-    desc = j['description']
-    lines = re.split(r'[\n\r•]|(?<=[.!?])\s+', desc)
-    mins = []
-    for line in lines:
-        if re.search(r'\b(?:require|qualification|experience|minimum|must have|you have|background)\b',line,re.I):
-            mins += [int(x) for x in EXPERIENCE.findall(line)]
-            if not mins and 'experience' in line.lower(): mins += [int(x) for x in EXPERIENCE_BEFORE.findall(line)]
-    if not mins: return False
-    # Any explicit requirement above five years excludes; conservatively prefer lower bounds.
-    return min(mins) <= 5 and max(mins) <= 5 and any(2 <= x <= 5 for x in mins)
+    allowed, score, reasons = assess(j.get('title',''), j.get('description',''))
+    j['score']=score
+    j['relevance']=', '.join(reasons[:4])
+    return allowed and us_eligible(j.get('location',''),j.get('country'))
 
 def connect():
     db = sqlite3.connect(DB)
@@ -109,9 +102,9 @@ def send_email(jobs):
     msg = EmailMessage()
     msg['From'], msg['To'] = user, recipient
     msg['Subject'] = f'{len(jobs)} new direct-ATS AI/Data engineering matches'
-    body = ['Newly discovered jobs from public employer ATS feeds.', 'Early listing = not verified absent from LinkedIn or Jobright.', '']
+    body = ['Newly discovered AI, ML, data, analytics and adjacent engineering roles.', 'Discovery time is not publication time. Listings may already be on LinkedIn or Jobright.', 'Non-employer feeds are credited alongside links.', '']
     for j in jobs:
-        body += [f"{j['title']} — {j['company']}",f"Location: {j['location']}",f"First seen (UTC): {j['first_seen']}",f"Employer published (UTC): {j['published'] or 'Unavailable'}",f"Freshness: {j['freshness']}",f"Apply: {j['url']}",'']
+        body += [f"{j['title']} — {j['company']}",f"Location: {j['location']}",f"First seen (UTC): {j['first_seen']}",f"Employer published (UTC): {j['published'] or 'Unavailable'}",f"Freshness: {j['freshness']}",f"Relevance score: {j.get('score','?')} — {j.get('relevance','')}",f"Source: {j.get('source') or j['ats']}",f"Link: {j['url']}",'']
     msg.set_content('\n'.join(body))
     port=int(os.getenv('SMTP_PORT','587'))
     if port == 465:
@@ -131,7 +124,7 @@ def main():
     parser.add_argument('--dry-run',action='store_true')
     args=parser.parse_args()
     boards=yaml.safe_load(Path('boards.yml').read_text(encoding='utf-8'))['boards']
-    dedup={(b['ats'],b['slug']):b for b in boards if b.get('ats') in ('greenhouse','lever','ashby','smartrecruiters')}
+    dedup={(b['ats'],b['slug']):b for b in boards if b.get('ats') in ('greenhouse','lever','ashby','smartrecruiters','remoteok','himalayas')}
     boards=list(dedup.values())
     if not boards: raise RuntimeError('No configured boards')
     def check(board):
@@ -150,6 +143,8 @@ def main():
     db=connect()
     try:
         initialized=db.execute("SELECT value FROM metadata WHERE key='initialized'").fetchone() is not None
+        expansion_ready=db.execute("SELECT value FROM metadata WHERE key='broad_relevance_v1'").fetchone() is not None
+        accepted_count=0
         pending=[]
         for board,found,error in results:
             if error:
@@ -157,38 +152,44 @@ def main():
                 continue
             for j in found:
                 if not eligible(j) or not str(j['url']).startswith('https://'): continue
+                accepted_count+=1
                 key=hashlib.sha256(f"{j['ats']}:{board['slug']}:{j['id']}".encode()).hexdigest()
                 published=j['published']
                 fresh=published is not None and timedelta(minutes=-5)<=NOW-published<=timedelta(minutes=60)
-                classification='published_within_60m' if fresh else ('first_discovered_time_unverified' if published is None else 'older_publication')
+                classification='published_within_60m' if fresh else ('first_discovered_time_unverified' if published is None else 'discovered_after_publication')
                 existing=db.execute('SELECT first_seen,alerted FROM jobs WHERE key=?',(key,)).fetchone()
                 first_seen=existing[0] if existing else iso(NOW)
-                alerted=existing[1] if existing else 0
+                alerted=existing[1] if existing else (1 if initialized and not expansion_ready else 0)
                 db.execute("""INSERT INTO jobs(key,company,title,location,url,published,first_seen,last_seen,alerted)
                     VALUES(?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(key) DO UPDATE SET company=excluded.company,title=excluded.title,location=excluded.location,url=excluded.url,published=excluded.published,last_seen=excluded.last_seen""",
                     (key,j['company'],j['title'],j['location'],j['url'],iso(published),first_seen,iso(NOW),alerted))
-                if initialized and not alerted and (fresh or published is None):
+                if initialized and expansion_ready and not alerted:
                     pending.append(dict(key=key,**j,first_seen=first_seen,freshness=classification))
+        if not expansion_ready:
+            db.execute("INSERT INTO metadata(key,value) VALUES('broad_relevance_v1',?)",(iso(NOW),))
         if not initialized:
             db.execute("INSERT INTO metadata(key,value) VALUES('initialized',?)",(iso(NOW),))
             # Baseline jobs must not be emailed subsequently.
             db.execute('UPDATE jobs SET alerted=1')
         db.commit()
-        if not initialized:
-            logging.info('Baseline established; subsequent runs notify on new jobs')
+        if not expansion_ready:
+            logging.info('Broader relevance baseline established (%s matches); alerts begin with the next run', accepted_count)
             return 0
         # Deduplicate digest, marking every source identity as alerted if delivery succeeds.
         unique={}
         for j in pending:
             signature=(re.sub(r'\W+','',j['company'].lower()),re.sub(r'\W+','',j['title'].lower()),re.sub(r'\W+','',j['location'].lower()))
             unique.setdefault(signature,j)
-        alerts=list(unique.values())
+        alerts=sorted(unique.values(),key=lambda j:j.get('score',0),reverse=True)[:40]
         if alerts and not args.dry_run and send_email(alerts):
-            db.executemany('UPDATE jobs SET alerted=1 WHERE key=?',[(j['key'],) for j in pending])
+            delivered={j['key'] for j in alerts}
+            delivered_signatures={(re.sub(r'\\W+','',j['company'].lower()),re.sub(r'\\W+','',j['title'].lower()),re.sub(r'\\W+','',j['location'].lower())) for j in alerts}
+            completed=[j['key'] for j in pending if (re.sub(r'\\W+','',j['company'].lower()),re.sub(r'\\W+','',j['title'].lower()),re.sub(r'\\W+','',j['location'].lower())) in delivered_signatures]
+            db.executemany('UPDATE jobs SET alerted=1 WHERE key=?',[(key,) for key in completed])
             db.commit()
-        Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'new_matches':len(alerts),'baseline':not initialized},indent=2))
-        logging.info('%s new matches',len(alerts))
+        Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'new_matches':len(alerts),'eligible_seen':accepted_count,'baseline':not expansion_ready},indent=2))
+        logging.info('%s eligible postings assessed; %s new matches for this digest', accepted_count,len(alerts))
     finally:
         db.close()
     return 0
