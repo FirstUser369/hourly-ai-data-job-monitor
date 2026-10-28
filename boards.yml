@@ -50,3 +50,6 @@ boards:
   - {ats: smartrecruiters, slug: Socotec, company: "SOCOTEC"}
   - {ats: smartrecruiters, slug: VTS3Corp, company: "VTS3 Corp"}
   - {ats: smartrecruiters, slug: prosidianconsulting, company: "ProSidian Consulting"}
+  # GitHub tracker listings: 'recent' is tracker-reported, not proof of employer publication.
+  - {ats: github_tracker, slug: zapply, company: "zapplyjobs/New-Grad-Jobs-2027"}
+  - {ats: github_tracker, slug: ml_tracker, company: "Tar-ive/ML_Newgrad_2027"}
