@@ -73,7 +73,7 @@ def fetch(board):
                 raise ValueError('Malformed SmartRecruiters feed')
             for j in jobs:
                 title=j.get('name') or ''
-                if not (assess(title, '')[0] or re.search(r'\\b(?:software|platform|research|applied|infrastructure|backend)\\b',title,re.I)):
+                if not (assess(title, '')[0] or re.search(r'\b(?:software|platform|research|applied|infrastructure|backend)\b',title,re.I)):
                     continue
                 posting_id=j.get('id')
                 if not posting_id or detail_count>=80:
