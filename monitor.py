@@ -1,7 +1,11 @@
-import os, re, json, html, sqlite3, smtplib, hashlib, logging
+import os, re, json, html, sqlite3, smtplib, hashlib, logging, argparse, time
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 from urllib.parse import urlparse
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import requests, yaml
 from bs4 import BeautifulSoup
 
@@ -14,7 +18,7 @@ EXPERIENCE = re.compile(r'(?<!\d)(\d{1,2})\s*(?:\+|(?:-|–|to)\s*\d{1,2})?\s*(?
 EXPERIENCE_BEFORE = re.compile(r'(?<!\d)(\d{1,2})\s*(?:\+|(?:-|–|to)\s*\d{1,2})?\s*(?:years?|yrs?)\b', re.I)
 STATES = re.compile(r'\b(?:USA|U\.S\.|United States|US Remote|Remote - US|Remote, US|Remote \(US\)|Remote \(USA\)|Remote \(United States\)|Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming|District of Columbia|Albuquerque|Atlanta|Austin|Baltimore|Boston|Charlotte|Chicago|Cincinnati|Cleveland|Columbus|Dallas|Denver|Detroit|Houston|Indianapolis|Jacksonville|Kansas City|Las Vegas|Los Angeles|Miami|Minneapolis|Nashville|New Orleans|New York City|Orlando|Philadelphia|Phoenix|Pittsburgh|Portland|Raleigh|Sacramento|Salt Lake City|San Antonio|San Diego|San Francisco|San Jose|Seattle|St\. Louis|Tampa|Washington DC)\b', re.I)
 STATE_CODES = re.compile(r',\s*(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MS|MN|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b')
-EXCLUDE = re.compile(r'\b(?:intern|internship|staff|principal|director|vp|head of|architect|manager)\b', re.I)
+EXCLUDE = re.compile(r'\b(?:intern|internship|co-op|new grad|staff|principal|director|vp|head of|architect|manager|recruiter|solutions engineer)\b', re.I)
 
 def plain(s):
     return BeautifulSoup(html.unescape(s or ''), 'html.parser').get_text(' ', strip=True)
@@ -27,8 +31,12 @@ def dateparse(value):
         return datetime.fromisoformat(str(value).replace('Z', '+00:00')).astimezone(timezone.utc)
     except (ValueError, TypeError, OverflowError): return None
 
-def get(url):
-    r = requests.get(url, headers=UA, timeout=25)
+SESSION = requests.Session()
+SESSION.headers.update(UA)
+SESSION.mount('https://', HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1, status_forcelist=[429,500,502,503,504], allowed_methods=['GET'])))
+
+def get(url, params=None):
+    r = SESSION.get(url, params=params, timeout=(8,25))
     r.raise_for_status()
     return r.json()
 
@@ -42,7 +50,7 @@ def fetch(board):
         data = get(f'https://api.lever.co/v0/postings/{slug}?mode=json')
         for j in data:
             cat = j.get('categories') or {}
-            yield dict(company=company, ats=ats, id=str(j['id']), title=j['text'], location=', '.join([str(x) for x in (cat.get('allLocations') or [cat.get('location','')]) if x]), description=plain(j.get('descriptionPlain') or j.get('description')), url=j.get('applyUrl') or j.get('hostedUrl',''), published=dateparse(j.get('createdAt')), updated=None, country=j.get('country'))
+            yield dict(company=company, ats=ats, id=str(j['id']), title=j['text'], location=', '.join([str(x) for x in (cat.get('allLocations') or [cat.get('location','')]) if x]), description=plain(j.get('descriptionPlain') or j.get('description')), url=j.get('applyUrl') or j.get('hostedUrl',''), published=None, updated=None, country=j.get('country'))
     elif ats == 'ashby':
         data = get(f'https://api.ashbyhq.com/posting-api/job-board/{slug}')
         for j in data['jobs']:
@@ -50,6 +58,19 @@ def fetch(board):
             locs = [j.get('location','')] + [x.get('location','') for x in j.get('secondaryLocations',[]) or []]
             country = (j.get('address') or {}).get('postalAddress',{}).get('addressCountry')
             yield dict(company=company, ats=ats, id=str(j.get('id') or j.get('jobUrl') or j['title']), title=j['title'], location=', '.join(filter(None,locs)), description=plain(j.get('descriptionPlain') or j.get('descriptionHtml')), url=j.get('applyUrl') or j.get('jobUrl',''), published=dateparse(j.get('publishedAt')), updated=None, country=country)
+    elif ats == 'smartrecruiters':
+        offset = 0
+        while offset < 3000:
+            data = get(f'https://api.smartrecruiters.com/v1/companies/{slug}/postings', {'limit':100,'offset':offset})
+            jobs = data.get('content')
+            if not isinstance(jobs,list): raise ValueError('Malformed SmartRecruiters feed')
+            for j in jobs:
+                l = j.get('location') or {}
+                location = ', '.join(str(l.get(k) or '') for k in ('city','region','country') if l.get(k))
+                description = plain(j.get('jobAd') if isinstance(j.get('jobAd'),str) else j.get('description'))
+                yield dict(company=company, ats=ats, id=str(j['id']),title=j.get('name') or j.get('title',''), location=location,description=description,url=j.get('jobAdUrl') or j.get('applyUrl') or j.get('ref',''),published=dateparse(j.get('releasedDate')),updated=None,country=l.get('country'))
+            if len(jobs)<100: break
+            offset+=100
     else: raise ValueError(f'Unsupported ATS: {ats}')
 
 def eligible(j):
@@ -73,7 +94,9 @@ def eligible(j):
 
 def connect():
     db = sqlite3.connect(DB)
+    db.execute('PRAGMA journal_mode=DELETE')
     db.execute('CREATE TABLE IF NOT EXISTS jobs (key TEXT PRIMARY KEY, company TEXT, title TEXT, location TEXT, url TEXT, published TEXT, first_seen TEXT, last_seen TEXT, alerted INTEGER DEFAULT 0)')
+    db.execute('CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT)')
     db.commit()
     return db
 
@@ -98,44 +121,72 @@ def send_email(jobs):
     return True
 
 def main():
-    with open('boards.yml', encoding='utf-8') as f: boards=yaml.safe_load(f)['boards']
-    db = connect()
-    initial = db.execute('SELECT COUNT(*) FROM jobs').fetchone()[0] == 0
-    pending = []
-    successes = 0
-    for board in boards:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--validate-only', action='store_true')
+    parser.add_argument('--dry-run',action='store_true')
+    args=parser.parse_args()
+    boards=yaml.safe_load(Path('boards.yml').read_text(encoding='utf-8'))['boards']
+    dedup={(b['ats'],b['slug']):b for b in boards if b.get('ats') in ('greenhouse','lever','ashby','smartrecruiters')}
+    boards=list(dedup.values())
+    if not boards: raise RuntimeError('No configured boards')
+    def check(board):
         try:
-            found = list(fetch(board)); successes += 1
-            logging.info('%s/%s: %d jobs', board['ats'],board['slug'],len(found))
-        except (requests.RequestException, KeyError, ValueError, TypeError) as e:
-            logging.error('Board failed %s/%s: %s',board['ats'],board['slug'],e)
-            continue
-        for j in found:
-            if not eligible(j) or not j['url'].startswith('https://'): continue
-            key = hashlib.sha256(f"{j['ats']}:{board['slug']}:{j['id']}".encode()).hexdigest()
-            published = j['published']
-            fresh = published is not None and timedelta(0) <= NOW-published <= timedelta(minutes=60)
-            freshness = 'Published within 60 minutes' if fresh else ('Newly discovered; publication time unavailable' if published is None else 'Older posting')
-            existing = db.execute('SELECT alerted FROM jobs WHERE key=?',(key,)).fetchone()
-            if existing:
-                db.execute('UPDATE jobs SET last_seen=? WHERE key=?',(iso(NOW),key))
-                if existing[0] == 0 and (fresh or published is None):
-                    pending.append(dict(key=key,**j,first_seen=iso(NOW),freshness=freshness))
-            else:
-                db.execute('INSERT INTO jobs(key,company,title,location,url,published,first_seen,last_seen,alerted) VALUES(?,?,?,?,?,?,?,?,?)', (key,j['company'],j['title'],j['location'],j['url'],iso(published),iso(NOW),iso(NOW), 1 if initial or (published and not fresh) else 0))
-                if not initial and (fresh or published is None): pending.append(dict(key=key,**j,first_seen=iso(NOW),freshness=freshness))
-    db.commit()
-    if successes == 0: raise RuntimeError('All ATS boards failed')
-    # Deduplicate within digest on normalized company/title/location.
-    unique = {}
-    for j in pending:
-        identity = (re.sub(r'\W+','',j['company'].lower()),re.sub(r'\W+','',j['title'].lower()),re.sub(r'\W+','',j['location'].lower()))
-        unique.setdefault(identity,j)
-    alerts = list(unique.values())
-    logging.info('New email candidates: %d; baseline: %s',len(alerts),initial)
-    if alerts and send_email(alerts):
-        db.executemany('UPDATE jobs SET alerted=1 WHERE key=?',[(j['key'],) for j in pending])
+            return (board,list(fetch(board)),None)
+        except (requests.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            return (board,[],f'{type(exc).__name__}: {exc}')
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results=list(pool.map(check,boards))
+    report={'scan_utc':iso(NOW),'boards':[{'company':b['company'],'ats':b['ats'],'slug':b['slug'],'ok':err is None,'jobs':len(jobs),'error':err} for b,jobs,err in results]}
+    Path('validation_report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+    successes=sum(err is None for _,_,err in results)
+    logging.info('Feed health: %s/%s OK',successes,len(results))
+    if args.validate_only: return 0 if successes else 2
+    if not successes: raise RuntimeError('All feeds failed. State was not changed.')
+    db=connect()
+    try:
+        initialized=db.execute("SELECT value FROM metadata WHERE key='initialized'").fetchone() is not None
+        pending=[]
+        for board,found,error in results:
+            if error:
+                logging.error('Feed failed %s/%s: %s',board['ats'],board['slug'],error)
+                continue
+            for j in found:
+                if not eligible(j) or not str(j['url']).startswith('https://'): continue
+                key=hashlib.sha256(f"{j['ats']}:{board['slug']}:{j['id']}".encode()).hexdigest()
+                published=j['published']
+                fresh=published is not None and timedelta(minutes=-5)<=NOW-published<=timedelta(minutes=60)
+                classification='published_within_60m' if fresh else ('first_discovered_time_unverified' if published is None else 'older_publication')
+                existing=db.execute('SELECT first_seen,alerted FROM jobs WHERE key=?',(key,)).fetchone()
+                first_seen=existing[0] if existing else iso(NOW)
+                alerted=existing[1] if existing else 0
+                db.execute("""INSERT INTO jobs(key,company,title,location,url,published,first_seen,last_seen,alerted)
+                    VALUES(?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(key) DO UPDATE SET company=excluded.company,title=excluded.title,location=excluded.location,url=excluded.url,published=excluded.published,last_seen=excluded.last_seen""",
+                    (key,j['company'],j['title'],j['location'],j['url'],iso(published),first_seen,iso(NOW),alerted))
+                if initialized and not alerted and (fresh or published is None):
+                    pending.append(dict(key=key,**j,first_seen=first_seen,freshness=classification))
+        if not initialized:
+            db.execute("INSERT INTO metadata(key,value) VALUES('initialized',?)",(iso(NOW),))
+            # Baseline jobs must not be emailed subsequently.
+            db.execute('UPDATE jobs SET alerted=1')
         db.commit()
-    db.close()
+        if not initialized:
+            logging.info('Baseline established; subsequent runs notify on new jobs')
+            return 0
+        # Deduplicate digest, marking every source identity as alerted if delivery succeeds.
+        unique={}
+        for j in pending:
+            signature=(re.sub(r'\W+','',j['company'].lower()),re.sub(r'\W+','',j['title'].lower()),re.sub(r'\W+','',j['location'].lower()))
+            unique.setdefault(signature,j)
+        alerts=list(unique.values())
+        if alerts and not args.dry_run and send_email(alerts):
+            db.executemany('UPDATE jobs SET alerted=1 WHERE key=?',[(j['key'],) for j in pending])
+            db.commit()
+        Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'new_matches':len(alerts),'baseline':not initialized},indent=2))
+        logging.info('%s new matches',len(alerts))
+    finally:
+        db.close()
+    return 0
 
-if __name__ == '__main__': main()
+if __name__=='__main__':
+    raise SystemExit(main())

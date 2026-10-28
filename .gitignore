@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 .env
+validation_report.json
+last_run.json

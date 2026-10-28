@@ -1,23 +1,36 @@
-# Hourly US AI/Data Engineering Job Monitor
+# Hourly US AI / ML / Data Engineer Monitor
 
-1. Create a **private** GitHub repository and upload these files, preserving `.github/workflows/hourly.yml`.
-2. Edit `boards.yml` with real company ATS board slugs (examples are not guaranteed live).
-3. Set GitHub Settings > Secrets and variables > Actions > New repository secret:
-   - `SMTP_HOST` e.g. `smtp.gmail.com`
-   - `SMTP_PORT` e.g. `587`
-   - `SMTP_USER` sender email
-   - `SMTP_PASSWORD` SMTP app password (not your regular account password)
-   - `ALERT_TO` recipient email
-4. In Settings > Actions > General set Workflow permissions to **Read and write permissions**.
-5. Run Actions > Hourly ATS job monitor > Run workflow to establish baseline.
-6. Subsequent scheduled runs at minute 17 UTC will email new matches. GitHub may delay scheduled workflows.
+Scheduled GitHub Actions job checks public employer ATS APIs every hour and emails newly discovered matching postings.
 
-## Caveats
-- Greenhouse `first_published` and Lever `createdAt` are used when supplied. Ashby public feeds may not provide a reliable publication timestamp; such matches are labeled newly discovered, not verified published in the last hour.
-- Strict experience matching may miss roles without explicit 2–5 year statements. Requirements with multiple numbers may be conservatively excluded.
-- Location heuristic excludes ambiguous remote-anywhere jobs and may miss US cities not listed. Review and extend the location rules.
-- The early-listing flag is **not** a verified LinkedIn/Jobright absence check. No board-index comparison is performed.
-- SQLite is committed to a private repo for persistence; this is a simple MVP, not an enterprise database. Keep the repo private.
-- First run baselines matching jobs without emailing. Avoid deleting the SQLite file or it will baseline again.
-- `first_seen` on retry candidates is the retry timestamp in the email, not the original DB first-seen time; inspect SQLite for the original value.
-- Employer board API availability, field names and terms may change. Check workflow logs for failed boards.
+**Roles:** AI/ML Engineer, ML Engineer, Applied AI Engineer, LLM Engineer, GenAI Engineer, Data Engineer.
+**Experience:** 2–5 years when an explicit requirement is available.
+**Location:** US-only, with conservative location matching.
+**Feeds:** Greenhouse, Lever, Ashby, SmartRecruiters (company identifier required).
+**Sources:** employer-direct application URLs; no aggregator scraping.
+
+## Activate
+1. Keep this GitHub repository **private**. GitHub Actions will commit `jobs.sqlite3` to preserve history.
+2. In Settings → Secrets and variables → Actions add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_TO`. Gmail normally uses `smtp.gmail.com`, port `465`, and an app password.
+3. Settings → Actions → General: enable **Read and write permissions**.
+4. Merge the implementation PR to `main`, then open Actions → Hourly direct ATS job monitor → Run workflow.
+5. The initial scan builds a baseline without emailing old listings. Check the `scan-report` artifact for broken/inactive ATS board slugs.
+6. Later successful scans send new matches. Failed feeds do not prevent other boards from being scanned.
+
+## Notes on accuracy
+- The **50 board slugs are candidates**, not 50 verified live feeds. The workflow creates a validation report on every scan; remove failed slugs after confirming actual employer ATS links.
+- A newly found posting is **not necessarily published within 60 minutes**. Ashby may supply `publishedAt`; Lever `createdAt` is not publication proof. The email distinguishes `published_within_60m` from `first_discovered_time_unverified`.
+- This monitor **does not check LinkedIn or Jobright** to prove that a job has not been indexed there.
+- US matching and years-of-experience extraction are conservative and may omit good matches. Review description before applying.
+- Workday's tenant-specific public pages are not implemented as a universal connector; avoid undocumented scraping bypasses.
+- GitHub's hourly scheduler is best effort, not an exact-time SLA. SMTP and live ATS connectivity require real-workflow verification.
+- State is stored in a committed SQLite file for a small private monitor, not a multi-user production database.
+- If email delivery fails, unalerted matches are eligible for retry on the next successful scan.
+- Secrets must never be committed.
+
+## Development
+```bash
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
+python monitor.py --validate-only
+python monitor.py --dry-run
+```
