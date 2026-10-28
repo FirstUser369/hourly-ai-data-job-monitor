@@ -17,7 +17,7 @@ Scheduled GitHub Actions job checks public employer ATS APIs every hour and emai
 6. Later successful scans send new matches. Failed feeds do not prevent other boards from being scanned.
 
 ## Notes on accuracy
-- The **50 board slugs are candidates**, not 50 verified live feeds. The workflow creates a validation report on every scan; remove failed slugs after confirming actual employer ATS links.
+- The **35 board slugs returned successful API responses** in the first live run (2026-10-28); 15 invalid candidates were removed after HTTP 404 errors. Live feed health is still rechecked hourly. The workflow creates a validation report on every scan; remove failed slugs after confirming actual employer ATS links.
 - A newly found posting is **not necessarily published within 60 minutes**. Ashby may supply `publishedAt`; Lever `createdAt` is not publication proof. The email distinguishes `published_within_60m` from `first_discovered_time_unverified`.
 - This monitor **does not check LinkedIn or Jobright** to prove that a job has not been indexed there.
 - US matching and years-of-experience extraction are conservative and may omit good matches. Review description before applying.
