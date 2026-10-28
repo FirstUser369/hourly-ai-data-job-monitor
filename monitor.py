@@ -174,6 +174,7 @@ def main():
             db.execute('UPDATE jobs SET alerted=1')
         db.commit()
         if not expansion_ready:
+            Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'eligible_seen':accepted_count,'new_matches':0,'baseline':True},indent=2))
             logging.info('Broader relevance baseline established (%s matches); alerts begin with the next run', accepted_count)
             return 0
         # Deduplicate digest, marking every source identity as alerted if delivery succeeds.
@@ -184,8 +185,8 @@ def main():
         alerts=sorted(unique.values(),key=lambda j:j.get('score',0),reverse=True)[:40]
         if alerts and not args.dry_run and send_email(alerts):
             delivered={j['key'] for j in alerts}
-            delivered_signatures={(re.sub(r'\\W+','',j['company'].lower()),re.sub(r'\\W+','',j['title'].lower()),re.sub(r'\\W+','',j['location'].lower())) for j in alerts}
-            completed=[j['key'] for j in pending if (re.sub(r'\\W+','',j['company'].lower()),re.sub(r'\\W+','',j['title'].lower()),re.sub(r'\\W+','',j['location'].lower())) in delivered_signatures]
+            delivered_signatures={(re.sub(r'\W+','',j['company'].lower()),re.sub(r'\W+','',j['title'].lower()),re.sub(r'\W+','',j['location'].lower())) for j in alerts}
+            completed=[j['key'] for j in pending if (re.sub(r'\W+','',j['company'].lower()),re.sub(r'\W+','',j['title'].lower()),re.sub(r'\W+','',j['location'].lower())) in delivered_signatures]
             db.executemany('UPDATE jobs SET alerted=1 WHERE key=?',[(key,) for key in completed])
             db.commit()
         Path('last_run.json').write_text(json.dumps({'scan_utc':iso(NOW),'boards_ok':successes,'boards_failed':len(results)-successes,'new_matches':len(alerts),'eligible_seen':accepted_count,'baseline':not expansion_ready},indent=2))
