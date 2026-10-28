@@ -50,10 +50,16 @@ def assess_new(job, checkpoint, existing):
     posted = job.get("published")
     # Employer source-reported publication time, not tracker-created timestamp.
     if job.get("ats") in ("greenhouse", "ashby", "smartrecruiters"):
-        if posted and posted.tzinfo and posted <= NOW and checkpoint and posted > checkpoint:
+        if posted and posted.tzinfo and checkpoint:
+            # Employer-supplied posting time overrides vague discovery status.
+            # Do not call an older publication "new" merely because the
+            # monitor has never seen that company/job ID before.
+            if posted > NOW or posted <= checkpoint:
+                return None
             previous_published = parse_iso(existing[1]) if existing else None
             if not previous_published or previous_published < posted:
                 return "Published since last run (employer timestamp)"
+            return None
     if job.get("ats") == "github_tracker":
         if existing:
             return None
