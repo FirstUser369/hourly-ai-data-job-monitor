@@ -1,6 +1,6 @@
 # Hourly AI / ML / Data Opportunity Monitor
 
-Automated hourly discovery from **35 previously live-validated employer ATS feeds**, plus two additional public remote job-board sources: **Remote OK** and **Himalayas** (37 configured feeds). An employer ATS is the best source for early direct-apply links; secondary boards expand company coverage but are not necessarily early.
+Automated hourly discovery from **35 previously live-validated employer ATS feeds**, plus three supplementary public job boards: **Remote OK**, **Himalayas**, and **Arbeitnow** (38 configured feeds). An employer ATS is the best source for early direct-apply links; secondary boards expand company coverage but are not necessarily early.
 
 ## Broader relevance matching
 
@@ -12,7 +12,7 @@ Up to **40 distinct highest-scored matches** are emailed per successful scan; un
 
 The old SQLite job history remains unchanged. On the first scan after deploying broader matching, the monitor **baselines the newly expanded job pool without emailing older results**. Subsequent scans alert on first-seen new matches, even if the provider supplies no trustworthy publish timestamp. The `first_seen` timestamp indicates **discovery by this monitor**, not guaranteed publication time. This initial rescan may take longer than earlier runs.
 
-The provider-specific APIs can return errors or change without notice. Each scan writes `validation_report.json` and `last_run.json`, uploaded as a GitHub Actions artifact. Failed feeds do not stop other working sources. The two new supplementary feeds have **not yet been live-validated in this repository** and their health needs to be checked after merge.
+The provider-specific APIs can return errors or change without notice. Each scan writes `validation_report.json` and `last_run.json`, uploaded as a GitHub Actions artifact. Failed feeds do not stop other working sources. The three new supplementary feeds have **not yet been live-validated in this repository** and their health needs to be checked after merge.
 
 ## Email setup
 
@@ -39,6 +39,7 @@ python monitor.py --dry-run
 - Remote OK: public JSON API `https://remoteok.com/api`, source attributed.
 - Himalayas: `https://himalayas.app/jobs/api/search`, uses unchanged `applicationLink` and source attribution. Public API cache is refreshed on a daily cadence and can lag new employer postings.
 - Remotive was **not** added to hourly checks: its public API is delayed 24 hours and advises at most four checks a day.
+- Arbeitnow: public board at `https://www.arbeitnow.com/api/job-board-api`, largely European/remote; only US-eligible listings are considered and source attribution is preserved.
 - Workday is not included without a supported per-tenant integration; no bypass of access controls or protected scraping.
 
 If this broad monitor is too noisy, adjust the `min_score` default in `matching.py`; raise it to be more selective, or lower it to increase recall. None of the new providers guarantees US availability without checking the original posting.
