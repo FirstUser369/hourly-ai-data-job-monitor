@@ -22,8 +22,8 @@ The system deduplicates jobs in the private SQLite history database and sends **
 No reliable service can read **every company's career website in the United States every hour**, and most career systems do not expose verified original posting times. Rather than claiming that, this repository includes a **weekly, opt-in company career-page discovery workflow**:
 
 1. Add official employer careers URLs to `career_pages.yml` (15 initial examples; URLs can change).
-2. Run Actions → **Discover public employer career feeds** → **Run workflow**; a weekly scheduled check also runs Sunday 07:41 UTC.
-3. The discovery script scans only these configured public landing pages for linked Greenhouse, Lever, Ashby, and SmartRecruiters company ATS boards. It validates API responses and commits `discovered_boards.yml`. It retains previously discovered feeds if a page temporarily fails.
+2. Run Actions → **Hourly AI/Data job monitor + career discovery** → **Run workflow**, and check the `discover_career_pages` option when you want to include career-page discovery. A weekly scheduled check also runs Sunday 07:41 UTC.
+3. The career-page discovery step in the unified workflow scans only these configured public landing pages for linked Greenhouse, Lever, Ashby, and SmartRecruiters company ATS boards. It validates API responses and commits `discovered_boards.yml`. It retains previously discovered feeds if a page temporarily fails.
 4. The hourly scanner automatically reads both `boards.yml` and `discovered_boards.yml` and deduplicates board identifiers.
 5. Review the `career-discovery-report-...` artifact to learn which company career pages were processed.
 
@@ -33,8 +33,8 @@ To add more US companies, extend `career_pages.yml` with their official careers 
 
 ## Run and verify
 
-- Actions → **Hourly direct ATS job monitor** → Run workflow on `main`. Cron is hourly at minute 17 UTC; GitHub may delay it. The default branch is monitored.
-- Actions → **Send test email** → Run workflow to verify delivery separately.
+- Actions → **Hourly AI/Data job monitor + career discovery** → Run workflow on `main`. For a manual run choose whether to also discover career pages; otherwise it just scans jobs. Cron scans hourly at minute 17 UTC, with discovery plus scan every Sunday at 07:41 UTC; GitHub may delay scheduled runs. The default branch is monitored.
+- The existing **Send test email** workflow remains separate so SMTP can be tested without changing job history.
 - Download the hourly **scan-report** artifact and inspect `last_run.json`, especially `verified_timestamp_jobs`, `posted_last_60_minutes`, `eligible_seen`, `new_matches`, and `boards_failed`.
 - First successful run after this change reuses the existing saved baseline; no reset.
 - GitHub repository should remain **private** because `jobs.sqlite3` is stored in version control.
