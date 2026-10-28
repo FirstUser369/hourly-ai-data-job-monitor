@@ -1,0 +1,8 @@
+# Replace these example slugs with verified employer board slugs.
+# Greenhouse: boards.greenhouse.io/SLUG
+# Lever: jobs.lever.co/SLUG
+# Ashby: jobs.ashbyhq.com/SLUG
+boards:
+  - {ats: greenhouse, slug: stripe, company: Stripe}
+  - {ats: lever, slug: palantir, company: Palantir}
+  - {ats: ashby, slug: ramp, company: Ramp}
