@@ -2,20 +2,20 @@
 
 ## Most important rule
 
-**The hourly email contains only matching jobs with an employer-reported publication or release timestamp in the 60 minutes preceding that scan.** The monitor never treats `first_seen`, an update timestamp, a job-board crawl time, or "newly discovered" as evidence that a listing was published in the last hour.
+**Employer ATS alerts require a publication or release timestamp in the preceding 60 minutes. GitHub watchlist alerts use separately labeled tracker-reported recency, not independent employer timestamps.** The monitor never treats `first_seen`, an update timestamp, a job-board crawl time, or "newly discovered" as evidence that a listing was published in the last hour.
 
 Supported employer publication signals:
 - **Greenhouse:** `first_published`, when exposed by the public response.
 - **Ashby:** `publishedAt`, the *last* published event (can include a republished older role).
 - **SmartRecruiters:** `releasedDate`, when exposed in public job details.
 
-Sources without reliable employer publication timestamps (including Lever, Remote OK, Himalayas, and Arbeitnow) are **not eligible for strict last-hour email alerts**. They remain available for feed discovery and validation, but an API's success does not imply that its jobs can pass the strict timestamp rule. Missing, future, and older timestamps are excluded. This deliberate accuracy-first choice means **some genuine newly posted jobs will be missed**, particularly if the source doesn't disclose publication time or GitHub delays a run.
+Other feeds without reliable employer publication timestamps (including Lever, Remote OK, Himalayas, and Arbeitnow) are **not eligible for employer-confirmed last-hour alerts**. They remain available for feed discovery and validation, but an API's success does not imply that its jobs can pass the strict timestamp rule. Missing, future, and older timestamps are excluded. This deliberate accuracy-first choice means **some genuine newly posted jobs will be missed**, particularly if the source doesn't disclose publication time or GitHub delays a run.
 
 ## Relevant roles
 
 Scoring matches across ML engineering, generative AI, LLMs, MLOps, AI platform, NLP, computer vision, data science, data engineering, analytics, BI and adjacent engineering work. There is no strict requirement that job titles match an exact phrase. The preference is roughly 2–5 years; missing years is allowed. Roles are US or potentially US-eligible remote, per conservative location heuristics.
 
-The system deduplicates jobs in the private SQLite history database and sends **at most 40** high-ranked, newly eligible published-within-last-hour postings per digest. Items with no reliable publication timestamp are NEVER emailed in this mode. SMTP must be configured in repository secrets; previous Gmail test has verified delivery.
+The system deduplicates jobs in the private SQLite history database and sends **at most 40** high-ranked, newly eligible published-within-last-hour postings per digest. Items with no reliable employer timestamp are not emailed from ATS feeds; tracker-reported GitHub recency is a separately labeled exception. SMTP must be configured in repository secrets; previous Gmail test has verified delivery.
 
 ## Employer careers expansion (bounded and safe)
 
@@ -52,3 +52,18 @@ python career_discovery.py
 ## Technical boundaries
 
 ATS boards can change without notice. Failed feeds are logged, and successful feeds continue. Discovery honors public surfaces without bypassing authentication. Employer publication timestamps can reflect first publication or republishing depending on ATS. Strict filtering is a **rolling 60-minute window**, not proof of first appearance online or absence from LinkedIn/Jobright. Scheduled GitHub Actions jobs are best effort and can miss windows if severely delayed.
+
+## GitHub job-list watchlists (new)
+
+Besides employer ATS feeds, the same hourly monitor now reads two public, frequently updated GitHub job repositories:
+
+- [zapplyjobs/New-Grad-Jobs-2027](https://github.com/zapplyjobs/New-Grad-Jobs-2027): parses actual six-column markdown job rows with minute-level age labels (for example, \`22m\`, \`59m\`); only those below 60 minutes qualify. Values such as \`1h\`, \`today\`, unknown, or older do NOT qualify. Its apply links may be **Zapply redirects**, not employer-direct application URLs. Labels are **tracker-reported**, not employer verified.
+- [Tar-ive/ML_Newgrad_2027](https://github.com/Tar-ive/ML_Newgrad_2027): reads structured \`data/listings.json\`, requires active US role with a "live" verification from Greenhouse, Ashby, or SmartRecruiters and an exact tracker-reported employer posting timestamp within 60 minutes. Direct application URL is preferred. This verifier is **third-party**, not an independent assertion by our monitor.
+
+No additional GitHub credentials are required. Both feeds run as part of the existing hourly GitHub Actions workflow. They are **two extra sources** on top of the original 46, giving 48 configured feeds. Source failures are recorded individually; remaining sources continue.
+
+**Two distinct freshness standards:** employer ATS alerts use the provider's actual timestamp; GitHub job tracker alerts use the source's reported time or reported employer verification. Every email labels the distinction, including the source and whether the link is an employer-direct URL. GitHub listings can be added late, backdated, or inaccurate. The tracker timestamp cannot prove that an opening first appeared on an employer's website within the last hour. If you want ONLY independently confirmed employer publications, remove the two \`github_tracker\` rows from \`boards.yml\`.
+
+Job matching remains broad, but internships, principal/staff/director roles, and non-US listings are still screened out. Title-only GitHub entries without a full description are inherently less certain about the exact years required. The normal SQLite alert deduplication and Gmail settings are unchanged.
+
+The GitHub Actions automatic schedule is **separate from data ingestion**. An integration that identifies more jobs cannot fix an absent \`schedule\` run. Verify the Actions run event is \`schedule\`, not \`workflow_dispatch\`; if GitHub still skips it, an approved external trigger may be necessary. GitHub's built-in cron scheduling is best effort.
