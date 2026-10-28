@@ -105,8 +105,7 @@ def iso(dt): return dt.isoformat(timespec='seconds') if dt else None
 def send_email(jobs):
     host, user, password, recipient = [os.getenv(x) for x in ('SMTP_HOST','SMTP_USER','SMTP_PASSWORD','ALERT_TO')]
     if not all((host,user,password,recipient)):
-        logging.warning('Email secrets not configured; matches retained for later notification')
-        return False
+        raise RuntimeError('Missing SMTP_HOST, SMTP_USER, SMTP_PASSWORD or ALERT_TO; unsent matches retained')
     msg = EmailMessage()
     msg['From'], msg['To'] = user, recipient
     msg['Subject'] = f'{len(jobs)} new direct-ATS AI/Data engineering matches'
@@ -114,10 +113,16 @@ def send_email(jobs):
     for j in jobs:
         body += [f"{j['title']} — {j['company']}",f"Location: {j['location']}",f"First seen (UTC): {j['first_seen']}",f"Employer published (UTC): {j['published'] or 'Unavailable'}",f"Freshness: {j['freshness']}",f"Apply: {j['url']}",'']
     msg.set_content('\n'.join(body))
-    with smtplib.SMTP(host, int(os.getenv('SMTP_PORT','587')), timeout=30) as smtp:
-        smtp.starttls()
-        smtp.login(user,password)
-        smtp.send_message(msg)
+    port=int(os.getenv('SMTP_PORT','587'))
+    if port == 465:
+        with smtplib.SMTP_SSL(host,port,timeout=30) as smtp:
+            smtp.login(user,password)
+            smtp.send_message(msg)
+    else:
+        with smtplib.SMTP(host,port,timeout=30) as smtp:
+            smtp.starttls()
+            smtp.login(user,password)
+            smtp.send_message(msg)
     return True
 
 def main():
