@@ -1,0 +1,13 @@
+boards:
+- ats: greenhouse
+  slug: figma
+  company: Figma
+- ats: greenhouse
+  slug: vercel
+  company: Vercel
+- ats: ashby
+  slug: replit
+  company: Replit
+- ats: ashby
+  slug: cohere
+  company: Cohere
