@@ -39,3 +39,6 @@ boards:
   - {ats: ashby, slug: pinecone, company: "Pinecone"}
   - {ats: ashby, slug: langchain, company: "LangChain"}
   - {ats: ashby, slug: cohere, company: "Cohere"}
+  - {ats: remoteok, slug: all, company: "Remote OK (attributed)"}
+  - {ats: himalayas, slug: us, company: "Himalayas (attributed)"}
+  - {ats: arbeitnow, slug: all, company: "Arbeitnow (attributed)"}

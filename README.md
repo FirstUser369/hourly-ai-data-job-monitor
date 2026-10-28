@@ -1,36 +1,45 @@
-# Hourly US AI / ML / Data Engineer Monitor
+# Hourly AI / ML / Data Opportunity Monitor
 
-Scheduled GitHub Actions job checks public employer ATS APIs every hour and emails newly discovered matching postings.
+Automated hourly discovery from **35 previously live-validated employer ATS feeds**, plus three supplementary public job boards: **Remote OK**, **Himalayas**, and **Arbeitnow** (38 configured feeds). An employer ATS is the best source for early direct-apply links; secondary boards expand company coverage but are not necessarily early.
 
-**Roles:** AI/ML Engineer, ML Engineer, Applied AI Engineer, LLM Engineer, GenAI Engineer, Data Engineer.
-**Experience:** 2–5 years when an explicit requirement is available.
-**Location:** US-only, with conservative location matching.
-**Feeds:** Greenhouse, Lever, Ashby, SmartRecruiters (company identifier required).
-**Sources:** employer-direct application URLs; no aggregator scraping.
+## Broader relevance matching
 
-## Activate
-1. Keep this GitHub repository **private**. GitHub Actions will commit `jobs.sqlite3` to preserve history.
-2. In Settings → Secrets and variables → Actions add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_TO`. Gmail normally uses `smtp.gmail.com`, port `465`, and an app password.
-3. Settings → Actions → General: enable **Read and write permissions**.
-4. Merge the implementation PR to `main`, then open Actions → Hourly direct ATS job monitor → Run workflow.
-5. The initial scan builds a baseline without emailing old listings. Check the `scan-report` artifact for broken/inactive ATS board slugs.
-6. Later successful scans send new matches. Failed feeds do not prevent other boards from being scanned.
+This version matches **fields and skills**, not exact job titles: machine learning, generative AI, NLP, computer vision, data platforms, ETL, analytics engineering, data science, experimentation, business intelligence, research engineering, platform engineering with AI/data technologies, MLOps, etc. It scores a job using the title and description. **2–5 years is preferred**, not a hard requirement, and missing experience numbers no longer reject a job. Internships and explicitly senior management/staff/principal roles are still excluded. US and worldwide-remote options can qualify.
 
-## Notes on accuracy
-- The **35 board slugs returned successful API responses** in the first live run (2026-10-28); 15 invalid candidates were removed after HTTP 404 errors. Live feed health is still rechecked hourly. The workflow creates a validation report on every scan; remove failed slugs after confirming actual employer ATS links.
-- A newly found posting is **not necessarily published within 60 minutes**. Ashby may supply `publishedAt`; Lever `createdAt` is not publication proof. The email distinguishes `published_within_60m` from `first_discovered_time_unverified`.
-- This monitor **does not check LinkedIn or Jobright** to prove that a job has not been indexed there.
-- US matching and years-of-experience extraction are conservative and may omit good matches. Review description before applying.
-- Workday's tenant-specific public pages are not implemented as a universal connector; avoid undocumented scraping bypasses.
-- GitHub's hourly scheduler is best effort, not an exact-time SLA. SMTP and live ATS connectivity require real-workflow verification.
-- State is stored in a committed SQLite file for a small private monitor, not a multi-user production database.
-- If email delivery fails, unalerted matches are eligible for retry on the next successful scan.
-- Secrets must never be committed.
+Up to **40 distinct highest-scored matches** are emailed per successful scan; unsent new matches remain pending. Each email includes its relevance rationale, first-seen timestamp, publication-time classification, provider/source name, and link. Employer ATS feeds link directly to employers; Remote OK and Himalayas links follow their respective feed terms. This system does **not** prove a listing is absent from LinkedIn/Jobright, and secondary feeds can have publication/cache delays.
 
-## Development
-```bash
+## Safety and transition
+
+The old SQLite job history remains unchanged. On the first scan after deploying broader matching, the monitor **baselines the newly expanded job pool without emailing older results**. Subsequent scans alert on first-seen new matches, even if the provider supplies no trustworthy publish timestamp. The `first_seen` timestamp indicates **discovery by this monitor**, not guaranteed publication time. This initial rescan may take longer than earlier runs.
+
+The provider-specific APIs can return errors or change without notice. Each scan writes `validation_report.json` and `last_run.json`, uploaded as a GitHub Actions artifact. Failed feeds do not stop other working sources. The three new supplementary feeds have **not yet been live-validated in this repository** and their health needs to be checked after merge.
+
+## Email setup
+
+Repository Settings → Secrets and variables → Actions:
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_TO`.
+
+For Gmail, use `smtp.gmail.com`, port `465`, and a Google App Password. Preserve Actions → General → **Read and write permissions**, because the history database is committed to the private repository.
+
+## Run
+
+Actions → Hourly direct ATS job monitor → Run workflow on `main`. Hourly schedule is at minute 17 UTC, but GitHub scheduling is best effort. The standalone **Send test email** workflow verifies SMTP separately. Tests run before every production scan.
+
+Local:
+```shell
 python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 python monitor.py --validate-only
 python monitor.py --dry-run
 ```
+
+## Source policy
+
+- Employer ATS feeds: Greenhouse, Lever, Ashby; SmartRecruiters adapter can be enabled with a validated company ID.
+- Remote OK: public JSON API `https://remoteok.com/api`, source attributed.
+- Himalayas: `https://himalayas.app/jobs/api/search`, uses unchanged `applicationLink` and source attribution. Public API cache is refreshed on a daily cadence and can lag new employer postings.
+- Remotive was **not** added to hourly checks: its public API is delayed 24 hours and advises at most four checks a day.
+- Arbeitnow: public board at `https://www.arbeitnow.com/api/job-board-api`, largely European/remote; only US-eligible listings are considered and source attribution is preserved.
+- Workday is not included without a supported per-tenant integration; no bypass of access controls or protected scraping.
+
+If this broad monitor is too noisy, adjust the `min_score` default in `matching.py`; raise it to be more selective, or lower it to increase recall. None of the new providers guarantees US availability without checking the original posting.
