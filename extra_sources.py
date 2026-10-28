@@ -47,3 +47,22 @@ def himalayas(session):
             yield dict(company=j.get('companyName','Unknown'),ats='himalayas',id=uid,title=j.get('title',''),
               location=loc,description=textify(j.get('description')),url=url,
               published=None,updated=None,country='US',source='Himalayas',employer_direct=False)
+
+def arbeitnow(session):
+    """Public board with mainly European jobs; US/wider remote filtering happens downstream."""
+    seen=set()
+    for page in range(1,4):
+        data=get(session,'https://www.arbeitnow.com/api/job-board-api',{'page':page})
+        items=data.get('data') or []
+        if not isinstance(items,list):raise ValueError('Arbeitnow malformed jobs feed')
+        for j in items:
+            uid=str(j.get('slug') or j.get('url') or '')
+            if not uid or uid in seen:continue
+            seen.add(uid)
+            url=j.get('url') or ''
+            if not str(url).startswith('https://'):continue
+            yield dict(company=j.get('company_name','Unknown'),ats='arbeitnow',id=uid,title=j.get('title',''),
+              location=j.get('location') or ('Remote worldwide' if j.get('remote') else ''),
+              description=textify(j.get('description')),url=url,published=None,updated=None,country=None,
+              source='Arbeitnow',employer_direct=False)
+        if not items:break
