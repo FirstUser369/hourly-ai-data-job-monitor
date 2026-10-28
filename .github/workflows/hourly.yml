@@ -1,27 +1,22 @@
-name: Hourly AI/Data job monitor + career discovery
+name: Find AI/Data jobs since my last run
 on:
-  schedule:
-    # Two off-peak triggers each hour reduce missed windows when GitHub delays/drops scheduled events.
-    # Both retain the strict 60-minute publication filter and SQLite deduplication.
-    - cron: '13,43 * * * *'
-    # Refresh opt-in employer career-page discovery weekly, then scan.
-    - cron: '41 7 * * 0'
   workflow_dispatch:
     inputs:
       discover_career_pages:
-        description: 'Also discover employer ATS feeds before the job scan'
+        description: 'Update public employer career feeds before searching'
         type: boolean
         required: false
         default: false
 permissions:
   contents: write
 concurrency:
-  group: unified-job-monitor
+  group: manual-job-search
   cancel-in-progress: false
 jobs:
-  monitor:
+  find-jobs:
+    name: Find jobs and build results
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
         with:
@@ -31,48 +26,36 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
-      - name: Unit tests
+      - name: Automated tests
         run: python -m unittest discover -s tests -v
-      - name: Discover public employer career feeds
-        id: discover
-        if: github.event.schedule == '41 7 * * 0' || inputs.discover_career_pages == true
-        continue-on-error: true
+      - name: Discover more company career feeds (optional)
+        if: inputs.discover_career_pages == true
         run: python career_discovery.py
-      - name: Scan jobs published in last 60 minutes
-        id: scan
+      - name: Fetch jobs and show results in this run
+        id: collect
         continue-on-error: true
-        env:
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          ALERT_TO: ${{ secrets.ALERT_TO }}
-        run: python monitor.py
-      - name: Upload scan and discovery reports
+        run: python on_demand.py
+      - name: Downloadable CSV, JSON and scan health
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: job-monitor-report-${{ github.run_id }}
+          name: jobs-since-last-run-${{ github.run_id }}
           path: |
-            validation_report.json
-            last_run.json
+            job_results/
             career_discovery_report.json
-          if-no-files-found: ignore
-      - name: Persist job history and validated career feeds
+          if-no-files-found: warn
+      - name: Save scan history
         if: always()
-        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [ -f jobs.sqlite3 ]; then git add -f jobs.sqlite3; fi
           if [ -f discovered_boards.yml ]; then git add -f discovered_boards.yml; fi
           if ! git diff --cached --quiet; then
-            git commit -m "Persist job history and career discoveries [skip ci]"
+            git commit -m "Save manual job search history [skip ci]"
             git pull --rebase
             git push
           fi
-      - name: Fail on scan or discovery failure
-        if: steps.scan.outcome == 'failure' || steps.discover.outcome == 'failure'
-        run: |
-          echo "Inspect earlier scan/discovery steps and uploaded reports."
-          exit 1
+      - name: Report scan failure
+        if: steps.collect.outcome == 'failure'
+        run: exit 1

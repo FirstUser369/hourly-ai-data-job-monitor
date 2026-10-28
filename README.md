@@ -1,54 +1,45 @@
-# US AI / ML / Data Job Monitor — strict last-hour alerts
+# On-demand US AI / ML / Data job finder
 
-## Most important rule
+**No automatic hourly runs. No job-alert emails.** Click **Run workflow** whenever you want to see jobs added since your previous run.
 
-**The hourly email contains only matching jobs with an employer-reported publication or release timestamp in the 60 minutes preceding that scan.** The monitor never treats `first_seen`, an update timestamp, a job-board crawl time, or "newly discovered" as evidence that a listing was published in the last hour.
+## How to run it
 
-Supported employer publication signals:
-- **Greenhouse:** `first_published`, when exposed by the public response.
-- **Ashby:** `publishedAt`, the *last* published event (can include a republished older role).
-- **SmartRecruiters:** `releasedDate`, when exposed in public job details.
+1. Go to **Actions → Find AI/Data jobs since my last run** in this repository.
+2. Click **Run workflow**, select `main`, and optionally check **Update public employer career feeds before searching**.
+3. Open the completed run and view the **job table in the Summary** (up to 180 rows).
+4. Under **Artifacts**, download `jobs-since-last-run-<run ID>`. It contains:
+   - `job_results/jobs_since_last_run.csv` — complete Excel-ready list, sortable and filterable
+   - `job_results/jobs_since_last_run.json` — full structured results
+   - `job_results/results_summary.md` — the table as Markdown
+   - `job_results/feed_health.json` — failures and source counts
 
-Sources without reliable employer publication timestamps (including Lever, Remote OK, Himalayas, and Arbeitnow) are **not eligible for strict last-hour email alerts**. They remain available for feed discovery and validation, but an API's success does not imply that its jobs can pass the strict timestamp rule. Missing, future, and older timestamps are excluded. This deliberate accuracy-first choice means **some genuine newly posted jobs will be missed**, particularly if the source doesn't disclose publication time or GitHub delays a run.
+The scan still includes **Greenhouse, Lever, Ashby, SmartRecruiters, Remote OK, Himalayas, Arbeitnow, and two GitHub job trackers**, plus any employer boards discovered from `career_pages.yml`.
 
-## Relevant roles
+## What "since the last run" actually means
 
-Scoring matches across ML engineering, generative AI, LLMs, MLOps, AI platform, NLP, computer vision, data science, data engineering, analytics, BI and adjacent engineering work. There is no strict requirement that job titles match an exact phrase. The preference is roughly 2–5 years; missing years is allowed. Roles are US or potentially US-eligible remote, per conservative location heuristics.
+The monitor saves a last-successful-manual-run timestamp in the existing private `jobs.sqlite3` file. On the first run after upgrading, it uses the latest timestamp from the older job-monitor database. On each subsequent successful run, the checkpoint advances.
 
-The system deduplicates jobs in the private SQLite history database and sends **at most 40** high-ranked, newly eligible published-within-last-hour postings per digest. Items with no reliable publication timestamp are NEVER emailed in this mode. SMTP must be configured in repository secrets; previous Gmail test has verified delivery.
+Results have **honest recency labels**:
+- **Published since last run (employer timestamp)**: a trusted employer feed explicitly reports a publication time later than the previous checkpoint; when reposted, this may reflect a subsequent release.
+- **GitHub tracker reports posted since last run (unverified)**: the GitHub source reports an age of minutes, hours, days, or weeks, indicating an approximate posting time within the selected interval. This is not independently verified.
+- **Newly discovered since last run (publication time unknown)**: absent from the saved job history, with no reliable original posting timestamp. These roles may actually have existed earlier.
 
-## Employer careers expansion (bounded and safe)
+A previously seen job is normally suppressed; unique identities are tracked in SQLite and duplicate company/role/location combinations are removed within each report. The full list is stored in CSV/JSON; the GitHub run Summary shows the first 180.
 
-No reliable service can read **every company's career website in the United States every hour**, and most career systems do not expose verified original posting times. Rather than claiming that, this repository includes a **weekly, opt-in company career-page discovery workflow**:
+**First-time setup:** If no earlier history exists, the initial run displays a baseline of current matching listings and labels the date limitation rather than calling them newly posted. The first run after this upgrade can include all jobs in newly added GitHub feeds. If a feed fails, the scan reports the failure and does not move the global checkpoint, so a later run can recover skipped publications.
 
-1. Add official employer careers URLs to `career_pages.yml` (15 initial examples; URLs can change).
-2. Run Actions → **Hourly AI/Data job monitor + career discovery** → **Run workflow**, and check the `discover_career_pages` option when you want to include career-page discovery. A weekly scheduled check also runs Sunday 07:41 UTC.
-3. The career-page discovery step in the unified workflow scans only these configured public landing pages for linked Greenhouse, Lever, Ashby, and SmartRecruiters company ATS boards. It validates API responses and commits `discovered_boards.yml`. It retains previously discovered feeds if a page temporarily fails.
-4. The hourly scanner automatically reads both `boards.yml` and `discovered_boards.yml` and deduplicates board identifiers.
-5. Review the `career-discovery-report-...` artifact to learn which company career pages were processed.
+## Matching preferences
 
-Discovery is limited to public links and scripts visible in the HTML. JavaScript-only career pages, Workday tenants, and sites without public ATS feeds need custom, permitted integrations. **Finding a feed is not the same as verifying an hourly publication timestamp**. Lever career feeds can be discovered but are excluded from strict-hour alerts unless a reliable publication signal becomes available.
+Target US and US-eligible remote roles in AI, ML, applied AI, LLMs, data science, data engineering, analytics, BI, MLOps, and adjacent software/platform work. Preference is ~2–5 years, with missing years allowed; internship, staff, principal and director roles are excluded. The relevance matcher uses title + description where available and scores the best matches first.
 
-To add more US companies, extend `career_pages.yml` with their official careers landing URLs. The job monitor does not autonomously enumerate all US employers.
+GitHub sources:
+- [zapplyjobs/New-Grad-Jobs-2027](https://github.com/zapplyjobs/New-Grad-Jobs-2027): reads the README's six-column job tables, including posting-age labels and Apply links (may redirect through Zapply).
+- [Tar-ive/ML_Newgrad_2027](https://github.com/Tar-ive/ML_Newgrad_2027): reads structured job records; only jobs with supported verification evidence qualify for a published time. This tracker may become unavailable or change format.
 
-## Run and verify
+## Maintenance and limits
 
-- Actions → **Hourly AI/Data job monitor + career discovery** → Run workflow on `main`. For a manual run choose whether to also discover career pages; otherwise it just scans jobs. Cron scans twice hourly at minutes 13 and 43 UTC, with discovery plus scan every Sunday at 07:41 UTC; GitHub may delay scheduled runs. The default branch is monitored.
-- The existing **Send test email** workflow remains separate so SMTP can be tested without changing job history.
-- Download the hourly **scan-report** artifact and inspect `last_run.json`, especially `verified_timestamp_jobs`, `posted_last_60_minutes`, `eligible_seen`, `new_matches`, and `boards_failed`.
-- First successful run after this change reuses the existing saved baseline; no reset.
-- GitHub repository should remain **private** because `jobs.sqlite3` is stored in version control.
-- Repository Settings → Actions → General: **Read and write permissions**.
-- Actions secrets: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_TO`. Gmail: `smtp.gmail.com`, SSL port `465`, Google App Password.
+The scanner uses public feeds and configured employer career pages. It is not a comprehensive index of every US employer. Github-age labels can be stale; direct ATS publication timestamps are not always exposed. New jobs posted and removed between two manual scans may never be observed. Careers discovered on JavaScript-only or nonpublic pages require additional supported adapters.
 
-Local testing:
-```sh
-python -m pip install -r requirements.txt
-python -m unittest discover -s tests -v
-python monitor.py --dry-run
-python career_discovery.py
-```
+**Keep the GitHub repository private**, because its job history is committed to source control. Allow **Read and write permissions** under Settings → Actions → General. The pre-existing SMTP secrets are no longer used by the main job finder; the standalone `Send test email` workflow remains separate.
 
-## Technical boundaries
-
-ATS boards can change without notice. Failed feeds are logged, and successful feeds continue. Discovery honors public surfaces without bypassing authentication. Employer publication timestamps can reflect first publication or republishing depending on ATS. Strict filtering is a **rolling 60-minute window**, not proof of first appearance online or absence from LinkedIn/Jobright. Scheduled GitHub Actions jobs are best effort and can miss windows if severely delayed.
+Run the unit tests locally with `python -m unittest discover -s tests -v` after installing `requirements.txt`.
