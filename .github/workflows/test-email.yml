@@ -1,0 +1,56 @@
+name: Send test email
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  email:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify SMTP and send a test message
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_TO: ${{ secrets.ALERT_TO }}
+        run: |
+          python - <<'PY'
+          import os
+          import smtplib
+          from email.message import EmailMessage
+
+          keys = ('SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'ALERT_TO')
+          missing = [key for key in keys if not os.getenv(key)]
+          if missing:
+              raise SystemExit('Missing GitHub Actions secrets: ' + ', '.join(missing))
+
+          host = os.environ['SMTP_HOST']
+          port = int(os.environ['SMTP_PORT'])
+          user = os.environ['SMTP_USER']
+          password = os.environ['SMTP_PASSWORD']
+          recipient = os.environ['ALERT_TO']
+
+          message = EmailMessage()
+          message['From'] = user
+          message['To'] = recipient
+          message['Subject'] = 'Job monitor SMTP test - delivery check'
+          message.set_content(
+              'Your hourly job monitor can send email successfully.\\n'
+              'This is a delivery test, not a job alert.\\n'
+              'If you received it, SMTP credentials and routing are working.\\n'
+          )
+          if port == 465:
+              with smtplib.SMTP_SSL(host, port, timeout=25) as smtp:
+                  smtp.login(user, password)
+                  smtp.send_message(message)
+          elif port == 587:
+              with smtplib.SMTP(host, port, timeout=25) as smtp:
+                  smtp.starttls()
+                  smtp.login(user, password)
+                  smtp.send_message(message)
+          else:
+              raise SystemExit('Unsupported SMTP port. Configure 465 or 587.')
+          print('SMTP server accepted the test message for delivery. Check recipient Inbox and Spam.')
+          PY
