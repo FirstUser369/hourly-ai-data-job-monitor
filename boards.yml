@@ -1,8 +1,54 @@
-# Replace these example slugs with verified employer board slugs.
-# Greenhouse: boards.greenhouse.io/SLUG
-# Lever: jobs.lever.co/SLUG
-# Ashby: jobs.ashbyhq.com/SLUG
+# Candidate ATS identifiers, not live-verified. Check validation_report.json after scans.
+# SmartRecruiters: add {ats: smartrecruiters, slug: VERIFIED_ID, company: Name}
+# Workday: not supported through an official universal public postings API.
 boards:
-  - {ats: greenhouse, slug: stripe, company: Stripe}
-  - {ats: lever, slug: palantir, company: Palantir}
-  - {ats: ashby, slug: ramp, company: Ramp}
+  - {ats: greenhouse, slug: stripe, company: "Stripe"}
+  - {ats: greenhouse, slug: datadog, company: "Datadog"}
+  - {ats: greenhouse, slug: cloudflare, company: "Cloudflare"}
+  - {ats: greenhouse, slug: figma, company: "Figma"}
+  - {ats: greenhouse, slug: discord, company: "Discord"}
+  - {ats: greenhouse, slug: reddit, company: "Reddit"}
+  - {ats: greenhouse, slug: plaid, company: "Plaid"}
+  - {ats: greenhouse, slug: notion, company: "Notion"}
+  - {ats: greenhouse, slug: coinbase, company: "Coinbase"}
+  - {ats: greenhouse, slug: duolingo, company: "Duolingo"}
+  - {ats: greenhouse, slug: robinhood, company: "Robinhood"}
+  - {ats: greenhouse, slug: mongodb, company: "MongoDB"}
+  - {ats: greenhouse, slug: asana, company: "Asana"}
+  - {ats: greenhouse, slug: vercel, company: "Vercel"}
+  - {ats: greenhouse, slug: affirm, company: "Affirm"}
+  - {ats: greenhouse, slug: instacart, company: "Instacart"}
+  - {ats: greenhouse, slug: brex, company: "Brex"}
+  - {ats: greenhouse, slug: scaleai, company: "Scale AI"}
+  - {ats: greenhouse, slug: samsara, company: "Samsara"}
+  - {ats: greenhouse, slug: grammarly, company: "Grammarly"}
+  - {ats: lever, slug: palantir, company: "Palantir"}
+  - {ats: lever, slug: netflix, company: "Netflix"}
+  - {ats: lever, slug: spotify, company: "Spotify"}
+  - {ats: lever, slug: anduril, company: "Anduril"}
+  - {ats: lever, slug: postman, company: "Postman"}
+  - {ats: lever, slug: rippling, company: "Rippling"}
+  - {ats: lever, slug: flexport, company: "Flexport"}
+  - {ats: lever, slug: coursera, company: "Coursera"}
+  - {ats: lever, slug: zoox, company: "Zoox"}
+  - {ats: lever, slug: benchling, company: "Benchling"}
+  - {ats: ashby, slug: ramp, company: "Ramp"}
+  - {ats: ashby, slug: openai, company: "OpenAI"}
+  - {ats: ashby, slug: anthropic, company: "Anthropic"}
+  - {ats: ashby, slug: linear, company: "Linear"}
+  - {ats: ashby, slug: perplexity, company: "Perplexity"}
+  - {ats: ashby, slug: harvey, company: "Harvey"}
+  - {ats: ashby, slug: mercury, company: "Mercury"}
+  - {ats: ashby, slug: cursor, company: "Cursor"}
+  - {ats: ashby, slug: modal, company: "Modal"}
+  - {ats: ashby, slug: retool, company: "Retool"}
+  - {ats: ashby, slug: vanta, company: "Vanta"}
+  - {ats: ashby, slug: runway, company: "Runway"}
+  - {ats: ashby, slug: elevenlabs, company: "ElevenLabs"}
+  - {ats: ashby, slug: glean, company: "Glean"}
+  - {ats: ashby, slug: replit, company: "Replit"}
+  - {ats: ashby, slug: pinecone, company: "Pinecone"}
+  - {ats: ashby, slug: togetherai, company: "Together AI"}
+  - {ats: ashby, slug: wandb, company: "Weights & Biases"}
+  - {ats: ashby, slug: langchain, company: "LangChain"}
+  - {ats: ashby, slug: cohere, company: "Cohere"}
