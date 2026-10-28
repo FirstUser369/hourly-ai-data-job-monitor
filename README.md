@@ -1,6 +1,6 @@
 # Hourly AI / ML / Data Opportunity Monitor
 
-Automated hourly discovery from **35 previously live-validated employer ATS feeds**, plus three supplementary public job boards: **Remote OK**, **Himalayas**, and **Arbeitnow** (38 configured feeds). An employer ATS is the best source for early direct-apply links; secondary boards expand company coverage but are not necessarily early.
+Automated hourly discovery from **35 previously live-validated employer ATS feeds**, plus three supplementary public job boards: **Remote OK**, **Himalayas**, and **Arbeitnow** (46 configured feeds in total including eight new SmartRecruiters employer candidates). An employer ATS is the best source for early direct-apply links; secondary boards expand company coverage but are not necessarily early.
 
 ## Broader relevance matching
 
@@ -35,7 +35,7 @@ python monitor.py --dry-run
 
 ## Source policy
 
-- Employer ATS feeds: Greenhouse, Lever, Ashby; SmartRecruiters adapter can be enabled with a validated company ID.
+- Employer ATS feeds: Greenhouse, Lever, Ashby; SmartRecruiters now has eight candidate employer IDs from observed employer posting URLs; these must pass live API checks before claiming active feeds. The adapter fetches descriptions through the documented public detail API and keeps employer posting/apply links.
 - Remote OK: public JSON API `https://remoteok.com/api`, source attributed.
 - Himalayas: `https://himalayas.app/jobs/api/search`, uses unchanged `applicationLink` and source attribution. Public API cache is refreshed on a daily cadence and can lag new employer postings.
 - Remotive was **not** added to hourly checks: its public API is delayed 24 hours and advises at most four checks a day.

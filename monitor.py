@@ -61,17 +61,43 @@ def fetch(board):
             country = (j.get('address') or {}).get('postalAddress',{}).get('addressCountry')
             yield dict(company=company, ats=ats, id=str(j.get('id') or j.get('jobUrl') or j['title']), title=j['title'], location=', '.join(filter(None,locs)), description=plain(j.get('descriptionPlain') or j.get('descriptionHtml')), url=j.get('applyUrl') or j.get('jobUrl',''), published=dateparse(j.get('publishedAt')), updated=None, country=country)
     elif ats == 'smartrecruiters':
-        offset = 0
-        while offset < 3000:
-            data = get(f'https://api.smartrecruiters.com/v1/companies/{slug}/postings', {'limit':100,'offset':offset})
-            jobs = data.get('content')
-            if not isinstance(jobs,list): raise ValueError('Malformed SmartRecruiters feed')
+        # Public list is metadata only: fetch details for potentially relevant titles.
+        # Hard cap avoids hundreds of unnecessary detail API calls per employer.
+        offset=0
+        detail_count=0
+        while offset < 200 and detail_count < 80:
+            data=get(f'https://api.smartrecruiters.com/v1/companies/{slug}/postings',
+                     {'limit':100,'offset':offset})
+            jobs=data.get('content')
+            if not isinstance(jobs,list):
+                raise ValueError('Malformed SmartRecruiters feed')
             for j in jobs:
-                l = j.get('location') or {}
-                location = ', '.join(str(l.get(k) or '') for k in ('city','region','country') if l.get(k))
-                description = plain(j.get('jobAd') if isinstance(j.get('jobAd'),str) else j.get('description'))
-                yield dict(company=company, ats=ats, id=str(j['id']),title=j.get('name') or j.get('title',''), location=location,description=description,url=j.get('jobAdUrl') or j.get('applyUrl') or j.get('ref',''),published=dateparse(j.get('releasedDate')),updated=None,country=l.get('country'))
-            if len(jobs)<100: break
+                title=j.get('name') or ''
+                if not (assess(title, '')[0] or re.search(r'\b(?:software|platform|research|applied|infrastructure|backend)\b',title,re.I)):
+                    continue
+                posting_id=j.get('id')
+                if not posting_id or detail_count>=80:
+                    break
+                detail_count+=1
+                try:
+                    detail=get(f'https://api.smartrecruiters.com/v1/companies/{slug}/postings/{posting_id}')
+                except (requests.RequestException, ValueError, KeyError):
+                    logging.warning('Could not fetch SmartRecruiters detail %s/%s',slug,posting_id)
+                    continue
+                sections=(detail.get('jobAd') or {}).get('sections') or {}
+                description=plain(' '.join(str(section.get('text') or '') for section in sections.values() if isinstance(section,dict)))
+                if not description:
+                    description=plain(detail.get('description') or '')
+                location_data=detail.get('location') or j.get('location') or {}
+                location=', '.join(str(location_data.get(k) or '') for k in ('city','region','country') if location_data.get(k))
+                url=detail.get('applyUrl') or detail.get('postingUrl') or ''
+                if not url.startswith('https://'):
+                    continue
+                yield dict(company=company,ats=ats,id=str(posting_id),title=title,location=location,
+                    description=description,url=url,published=dateparse(detail.get('releasedDate')),
+                    updated=None,country=location_data.get('country'))
+            if len(jobs)<100:
+                break
             offset+=100
     elif ats == 'remoteok':
         yield from remoteok(SESSION)
