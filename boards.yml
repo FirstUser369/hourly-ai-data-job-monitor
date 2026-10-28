@@ -41,3 +41,4 @@ boards:
   - {ats: ashby, slug: cohere, company: "Cohere"}
   - {ats: remoteok, slug: all, company: "Remote OK (attributed)"}
   - {ats: himalayas, slug: us, company: "Himalayas (attributed)"}
+  - {ats: arbeitnow, slug: all, company: "Arbeitnow (attributed)"}
