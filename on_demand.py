@@ -94,9 +94,15 @@ def safe_cell(value):
 
 
 def write_results(rows, checkpoint, source_label, report, failed):
-    rows.sort(key=lambda j: (j["status"].startswith("Published"), j["score"]), reverse=True)
+    # Experience preference takes precedence over recency and relevance score.
+    tiers={"experience: 3–4 years (highest priority)":4,
+           "experience: 0–2 years (included)":3,
+           "experience: 5 years (lower priority)":2,
+           "experience not specified":1}
+    rows.sort(key=lambda j: (tiers.get(j.get("experience"),0),
+                             j["status"].startswith("Published"), j["score"]), reverse=True)
     fields = ["company", "title", "location", "source", "published_utc", "first_seen_utc",
-              "score", "relevance", "status", "apply_url"]
+              "score", "experience", "relevance", "status", "apply_url"]
     with (OUTPUT / "jobs_since_last_run.csv").open("w", newline="", encoding="utf-8-sig") as out:
         writer = csv.DictWriter(out, fieldnames=fields)
         writer.writeheader()
@@ -122,15 +128,15 @@ def write_results(rows, checkpoint, source_label, report, failed):
         "",
         f"### Results (first {min(len(rows),MAX_SUMMARY_ROWS)} of {len(rows)})",
         "",
-        "| Company | Role | Location | Recency | Source | Apply |",
-        "|---|---|---|---|---|---|",
+        "| Company | Role | Location | Experience | Recency | Source | Apply |",
+        "|---|---|---|---|---|---|---|",
     ]
     for row in rows[:MAX_SUMMARY_ROWS]:
         url=safe_link(row["apply_url"])
         link=f"[Open]({url})" if url else "Unavailable"
         lines.append("| " + " | ".join([
             safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
-            safe_cell(row["status"]),safe_cell(row["source"]),link
+            safe_cell(row["experience"]),safe_cell(row["status"]),safe_cell(row["source"]),link
         ]) + " |")
     if not rows:
         lines.extend(["", "**No matching new openings found in the checked feeds.** "
@@ -237,11 +243,12 @@ def main():
                 if signature in seen:
                     continue
                 seen.add(signature)
+                experience=next((label for label in str(job.get("relevance","")).split(", ") if label.startswith("experience")), "experience not specified")
                 result.append({"company":job["company"],"title":job["title"],
                                "location":job.get("location",""),"source":job.get("source") or board["ats"],
                                "published_utc":published or "",
                                "first_seen_utc":first_seen,"score":job.get("score",0),
-                               "relevance":job.get("relevance",""),"status":status,"apply_url":url})
+                               "experience":experience,"relevance":job.get("relevance",""),"status":status,"apply_url":url})
         total,published,discovered=write_results(result,checkpoint,checkpoint_basis,health,failed)
         # If ANY feed fails, do not advance the global checkpoint: the next manual
         # run can recover the missed published-time interval for that feed.

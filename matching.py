@@ -12,11 +12,11 @@ GROUPS = {
 TITLE_HINT = re.compile(r'\b(?:engineer|developer|scientist|analyst|researcher|specialist|architect|technologist|programmer|consultant)\b', re.I)
 TECH = re.compile(r'\b(?:python|pytorch|tensorflow|sql|spark|kafka|snowflake|aws|azure|gcp|vector database|llm|mlops|machine learning|etl|dbt|databricks)\b',re.I)
 SENIOR_EXCLUDE = re.compile(r'\b(?:intern(?:ship)?|co.op|staff|principal|director|vice president|vp|head of|chief|distinguished|fellow)\b',re.I)
-YEARS = re.compile(r'(?<!\d)(\d{1,2})(?:\s*[-–]\s*\d{1,2})?\s*\+?\s*(?:years?|yrs?)\b',re.I)
+YEARS = re.compile(r'(?<!\d)(\d{1,2})(?:\s*(?:[-–—]|to)\s*(\d{1,2}))?\s*\+?\s*(?:years?|yrs?)\b', re.I)
 
 def assess(title, description='', min_score=5):
     """Return (accepted, score, reasons); title carries strongest weight.
-    Missing years is allowed; seniority evidence is a soft preference.
+    Missing years are accepted and labeled; requirements above five years are rejected.
     """
     title=title or ''
     description=description or ''
@@ -38,12 +38,23 @@ def assess(title, description='', min_score=5):
     if not strong_title and not (TITLE_HINT.search(title) and len(reasons)>=2 and TECH.search(description)):
         return False,score,['technical relevance too weak']
     if TITLE_HINT.search(title): score+=1
-    y=YEARS.search(description[:12000])
-    if y:
-        n=int(y.group(1))
-        if n>=8: score-=3;reasons.append('may require 8+ years')
-        elif 2<=n<=5:score+=2;reasons.append('2–5 years noted')
-        elif n<=1:score+=1;reasons.append('entry-level noted')
+    # Inspect all explicit year requirements, not only the first mention.
+    mentions=list(YEARS.finditer(description[:12000]))
+    if mentions:
+        required=max(int(match.group(2) or match.group(1)) for match in mentions)
+        if required>=6:
+            return False,0,['requires more than 5 years']
+        if required in (3,4):
+            score+=7
+            reasons.append('experience: 3–4 years (highest priority)')
+        elif required<=2:
+            score+=4
+            reasons.append('experience: 0–2 years (included)')
+        else:
+            score+=1
+            reasons.append('experience: 5 years (lower priority)')
+    else:
+        reasons.append('experience not specified')
     return score>=min_score,score,reasons
 
 def us_eligible(location='',country=None):
