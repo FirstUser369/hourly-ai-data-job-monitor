@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock,patch
 import fortune500_registry as f
-from career_discovery import career_links
+from career_discovery import career_links, missing_fortune_ranks
 
 class Fortune2026Tests(unittest.TestCase):
     def test_exact_500_with_domains(self):
@@ -59,6 +59,13 @@ class Fortune2026Tests(unittest.TestCase):
         rows=f.load_fortune500(session)
         self.assertEqual(len(rows),499)
         self.assertNotIn(333,[x["fortune_rank"] for x in rows])
+    def test_missing_rank_reporting_with_duplicate_rank_source(self):
+        records=[{"fortune_rank":i} for i in range(1,501) if i!=160]
+        records.append({"fortune_rank":159})
+        self.assertEqual(missing_fortune_ranks(records),[160])
+        self.assertEqual(missing_fortune_ranks([]),list(range(1,501)))
+        self.assertEqual(missing_fortune_ranks([{"fortune_rank":i} for i in range(1,501)]),[])
+
     def test_career_anchor_discovery(self):
         html='<a href="/careers/">Careers</a><a href="/products">Products</a><a href="https://unrelated.example/jobs">jobs</a>'
         self.assertEqual(career_links(html,"https://example.com/"),["https://example.com/careers/"])
