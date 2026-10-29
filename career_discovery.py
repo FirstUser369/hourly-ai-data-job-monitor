@@ -14,6 +14,8 @@ import ipaddress
 import requests
 import yaml
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+from fortune500_registry import load_fortune500, SOURCE as FORTUNE_SOURCE, CREDIT as FORTUNE_CREDIT
 
 ALLOWED = {
     "boards.greenhouse.io":"greenhouse",
@@ -86,6 +88,23 @@ def validate_public_feed(session,board):
     except (requests.RequestException,ValueError):
         return False
 
+def career_links(html, origin):
+    """Follow actual public career links, never guessed paths."""
+    host=urlparse(origin).hostname or ""
+    links=[]
+    for tag in BeautifulSoup(html,"html.parser").select("a[href]"):
+        target=urljoin(origin,tag.get("href") or "")
+        if not safe_url(target):
+            continue
+        target_host=urlparse(target).hostname or ""
+        label=tag.get_text(" ",strip=True).lower()
+        path=urlparse(target).path.lower()
+        same_domain=(target_host==host or target_host.endswith("."+host))
+        related=bool(re.search(r"\b(careers?|jobs?|join us|join our team|work with us|open positions|opportunities)\b",label) or re.search(r"/(careers?|jobs?|join-us|opportunities)(?:/|$)",path))
+        if same_domain and related and target not in links and target!=origin:
+            links.append(target)
+    return links[:2]
+
 def inspect_page(record):
     company=str(record.get("company") or "").strip()
     url=str(record.get("url") or "").strip()
@@ -102,9 +121,19 @@ def inspect_page(record):
         if len(resp.content)>2_000_000:
             raise ValueError("HTML landing page too large")
         potential=parse_careers_html(resp.text,resp.url,company)
+        targets=career_links(resp.text,resp.url) if record.get("registry")=="fortune500_2026" else []
+        for target in targets:
+            try:
+                another=session.get(target,timeout=(5,12),allow_redirects=True)
+                another.raise_for_status()
+                if safe_url(another.url) and len(another.content)<=2_000_000:
+                    potential.extend(parse_careers_html(another.text,another.url,company))
+            except (requests.RequestException,ValueError):
+                pass
+        potential=list({(b["ats"],b["slug"]):b for b in potential}.values())
         verified=[board for board in potential if validate_public_feed(session,board)]
         return verified,{"company":company,"url":url,"status":"verified_feed" if verified else "no_public_ats_found",
-                         "potential_feeds":len(potential),"verified_feed_count":len(verified)}
+                         "potential_feeds":len(potential),"career_links_checked":len(targets),"verified_feed_count":len(verified)}
     except (requests.RequestException,ValueError,TypeError) as err:
         logging.warning("Career page %s: %s",company,type(err).__name__)
         return [],{"company":company,"url":url,"status":"failed","error":type(err).__name__,
@@ -119,9 +148,18 @@ def main():
     companies=(yaml.safe_load(registry.read_text(encoding="utf-8")) or {}).get("companies",[])
     if not isinstance(companies,list):
         raise ValueError("companies must be a list")
-    # More than 100 companies can be checked on a manual run without serial waits.
-    with ThreadPoolExecutor(max_workers=10) as pool:
-        results=list(pool.map(inspect_page,companies[:200]))
+    try:
+        fortune=load_fortune500()
+        fortune_error=None
+    except (requests.RequestException,ValueError,UnicodeError) as exc:
+        fortune=[]
+        fortune_error=type(exc).__name__+": "+str(exc)
+        logging.error("Fortune 500 import unavailable: %s",fortune_error)
+    registered={urlparse(str(item.get("url") or "")).hostname for item in companies}
+    additional=[item for item in fortune if urlparse(item["url"]).hostname not in registered]
+    all_companies=companies+additional
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        results=list(pool.map(inspect_page,all_companies[:800]))
     confirmed={}
     report=[]
     for boards,entry in results:
@@ -138,7 +176,10 @@ def main():
         if board.get("ats") in ALLOWED.values() and SLUG.fullmatch(str(board.get("slug") or "")):
             confirmed.setdefault((board["ats"],board["slug"]),board)
     output.write_text(yaml.safe_dump({"boards":list(confirmed.values())},sort_keys=False),encoding="utf-8")
-    summary={"configured_pages":len(companies),"checked_pages":len(report),"verified_this_run":newly_verified,
+    summary={"configured_pages":len(companies),"fortune500_year":2026,"fortune500_source":FORTUNE_SOURCE,
+             "fortune500_credit":FORTUNE_CREDIT,"fortune500_loaded":len(fortune),
+             "fortune500_error":fortune_error,"fortune500_added":len(additional),
+             "total_candidates":len(all_companies),"checked_pages":len(report),"verified_this_run":newly_verified,
              "validated_boards_total":len(confirmed),
              "no_public_ats_found":sum(x["status"]=="no_public_ats_found" for x in report),
              "failed_pages":sum(x["status"]=="failed" for x in report),"pages":report}
@@ -150,6 +191,7 @@ def main():
         with open(summary_file,"a",encoding="utf-8") as handle:
             handle.write("\n### Employer career-page discovery\n\n")
             handle.write(f"- Candidate employer pages checked: **{len(report)}**\n")
+            handle.write(f"- Fortune 500 companies loaded: **{len(fortune)}/500**\n")
             handle.write(f"- Public ATS feeds validated this run: **{newly_verified}**\n")
             handle.write(f"- Validated feeds retained in registry: **{len(confirmed)}**\n")
             handle.write(f"- Pages without visible public ATS: **{summary['no_public_ats_found']}**\n")
