@@ -44,3 +44,11 @@ The scanner uses public feeds and configured employer career pages. Jobicy's pub
 **Keep the GitHub repository private**, because its job history is committed to source control. Allow **Read and write permissions** under Settings → Actions → General. The pre-existing SMTP secrets are no longer used by the main job finder; the standalone `Send test email` workflow remains separate.
 
 Run the unit tests locally with `python -m unittest discover -s tests -v` after installing `requirements.txt`.
+
+## 139 AI-focused employer career pages (opt-in discovery)
+
+The file [career_pages.yml](career_pages.yml) now contains **139 candidate company career URLs**, grouped by frontier AI/model platforms, cloud/data infrastructure, consumer/fintech marketplaces, and autonomy/robotics/security/enterprise AI. These are candidate links, **not 139 verified active ATS feeds**. Career page URLs can move or be inaccessible; JS-only pages and Workday tenants are not automatically scraped.
+
+To check them, click **Actions → Find AI/Data jobs since my last run → Run workflow** and enable **Update public employer career feeds before searching**. This scans up to 200 configured public pages using up to 10 workers, validates supported linked Greenhouse, Ashby, Lever, and SmartRecruiters feeds, and adds usable feeds to the same job search. The Actions **Summary** reports pages checked, public ATS feeds validated, and failed/no-ATS counts. Download **career_discovery_report.json** for a per-company breakdown. Existing verified feeds are retained when pages fail temporarily.
+
+**Important:** Career discovery is optional and does not query all 139 company job catalogs directly. Workday and proprietary career sites require provider-specific integrations. The new registry is intended to expand coverage incrementally as verifiable feeds are discovered, without inventing coverage.
