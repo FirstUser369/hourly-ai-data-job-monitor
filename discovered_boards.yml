@@ -1,13 +1,88 @@
 boards:
+- ats: ashby
+  slug: cohere
+  company: Cohere
+- ats: ashby
+  slug: fireworks
+  company: Fireworks AI
+- ats: ashby
+  slug: anyscale
+  company: Anyscale
+- ats: ashby
+  slug: suno
+  company: Suno
+- ats: ashby
+  slug: character
+  company: Character.AI
+- ats: ashby
+  slug: writer
+  company: Writer
+- ats: ashby
+  slug: Sierra
+  company: Sierra
+- ats: ashby
+  slug: sierra-jp
+  company: Sierra
+- ats: ashby
+  slug: langchain
+  company: LangChain
+- ats: ashby
+  slug: pinecone
+  company: Pinecone
+- ats: ashby
+  slug: lambda
+  company: Lambda
+- ats: ashby
+  slug: Crusoe
+  company: Crusoe
+- ats: ashby
+  slug: Deepgram
+  company: Deepgram
+- ats: greenhouse
+  slug: assemblyai
+  company: AssemblyAI
+- ats: ashby
+  slug: hume-ai
+  company: Hume AI
+- ats: ashby
+  slug: pika
+  company: Pika
+- ats: greenhouse
+  slug: vercel
+  company: Vercel
+- ats: greenhouse
+  slug: netlify
+  company: Netlify
 - ats: greenhouse
   slug: figma
   company: Figma
 - ats: greenhouse
-  slug: vercel
-  company: Vercel
+  slug: reddit
+  company: Reddit
+- ats: lever
+  slug: shieldai
+  company: Shield AI
+- ats: greenhouse
+  slug: aechelontechnology
+  company: Shield AI
+- ats: ashby
+  slug: applied
+  company: Applied Intuition
+- ats: lever
+  slug: palantir
+  company: Palantir
+- ats: greenhouse
+  slug: c3ascend
+  company: C3 AI
+- ats: greenhouse
+  slug: dataiku
+  company: Dataiku
+- ats: greenhouse
+  slug: recursionpharmaceuticals
+  company: Recursion
+- ats: ashby
+  slug: benchling
+  company: Benchling
 - ats: ashby
   slug: replit
   company: Replit
-- ats: ashby
-  slug: cohere
-  company: Cohere
