@@ -28,6 +28,7 @@ class LargeRegistryTests(unittest.TestCase):
         fake.text="<html>Company careers page</html>"
         fake.raise_for_status.return_value=None
         session=Mock()
+        session.headers={}
         session.get.return_value=fake
         with patch.object(c.requests,"Session",return_value=session):
             boards,record=c.inspect_page({"company":"Acme","url":"https://example.com/careers"})
