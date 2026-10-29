@@ -6,6 +6,9 @@ boards:
   slug: fireworks
   company: Fireworks AI
 - ats: ashby
+  slug: anyscale
+  company: Anyscale
+- ats: ashby
   slug: suno
   company: Suno
 - ats: ashby
@@ -89,9 +92,6 @@ boards:
 - ats: smartrecruiters
   slug: external-referrals
   company: Avery Dennison
-- ats: ashby
-  slug: anyscale
-  company: Anyscale
 - ats: ashby
   slug: replit
   company: Replit
