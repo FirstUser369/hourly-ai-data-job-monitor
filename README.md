@@ -73,3 +73,9 @@ If the Fortune dataset is inaccessible or malformed, discovery shows an import f
 ### Fortune roster resilience
 
 The published 2026 Fortune 500 dataset can contain all 500 ranked companies but fewer than 500 usable corporate domains. Discovery **preserves all 500 roster entries** and scans every usable homepage instead of discarding the entire list. Missing/invalid domains are explicitly reported in `career_discovery_report.json` under `fortune500_missing_companies`, with each company and rank. If the source itself is unavailable or lacks 500 ranked records, the workflow reports a discovery error rather than silently showing 0/500 as successful. Adding a company to the registry does not prove its jobs are integrated with the strict latest-only job report.
+
+### Rolling latest-48h results and Fortune data irregularities
+
+Unlike the old *since my last scan* logic, a verified role published within the last 48 hours remains visible on **every manual run** until it ages out. The SQLite scan checkpoint is still maintained for audit/history but does not hide otherwise-current jobs. Only postings still in the supported employer feeds and passing the public application-page check appear.
+
+The Fortune 2026 CSV can contain duplicate or missing rank numbers. The importer keeps one entry per rank (preferring a row with a usable corporate domain) and scans all available distinct companies instead of discarding everything. The summary reports **distinct ranks loaded out of 500**, explicit missing rank numbers and entries without usable domains. A partial source is transparently reported as partial; missing company records are never invented.
