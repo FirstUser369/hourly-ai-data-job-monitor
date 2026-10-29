@@ -76,3 +76,28 @@ def simplify(session):
     r=session.get("https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/README.md",timeout=(10,35))
     r.raise_for_status()
     return parse_simplify(r.text)
+
+def parse_applyguy(data):
+    """Use direct employer listing URLs from ApplyGuy's public structured GitHub list."""
+    if not isinstance(data,dict) or not isinstance(data.get("jobs"),list):
+        raise ValueError("ApplyGuy job feed malformed")
+    jobs=[]
+    for j in data["jobs"]:
+        if not isinstance(j,dict):
+            continue
+        url=str(j.get("listingUrl") or "")
+        if not url.startswith("https://") or not j.get("title") or not j.get("company"):
+            continue
+        location=str(j.get("location") or "")
+        jobs.append(dict(ats="github_applyguy",id=str(j.get("id") or url),
+            company=j["company"],title=j["title"],location=location,description="",
+            url=url,published=None,country=None,
+            source="ApplyGuy/2027-New-Grad-Jobs",
+            tracker_reported_posted=str(j.get("posted") or ""),
+            employer_direct=True))
+    return jobs
+
+def applyguy(session):
+    r=session.get("https://raw.githubusercontent.com/ApplyGuy/2027-New-Grad-Jobs/main/data/new-grad-jobs.json",timeout=(10,35))
+    r.raise_for_status()
+    return parse_applyguy(r.json())
