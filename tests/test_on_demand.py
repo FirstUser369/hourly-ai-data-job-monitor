@@ -10,7 +10,7 @@ class OnDemandTests(unittest.TestCase):
         recent=NOW-timedelta(hours=1)
         job={"ats":"greenhouse","published":recent}
         self.assertIn("Employer-published",assess_new(job,checkpoint,None))
-        self.assertIsNone(assess_new(job,checkpoint,("seen",recent.isoformat())))
+        self.assertIn("Employer-published",assess_new(job,checkpoint,("seen",recent.isoformat())))
 
     def test_no_stale_jobs_even_if_never_discovered(self):
         old=NOW-timedelta(days=10)

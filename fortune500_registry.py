@@ -34,8 +34,6 @@ def load_fortune500(session=None):
         if not rank.isdecimal() or not (1<=int(rank)<=500):
             continue
         rank=int(rank)
-        if rank in items:
-            raise ValueError("Duplicate Fortune rank %d"%rank)
         # Preserve the company's roster entry even when the source has no
         # company domain. Missing domains must not hide the other 498.
         homepage=""
@@ -46,10 +44,17 @@ def load_fortune500(session=None):
             parsed=urlparse(domain)
             if parsed.scheme=="https" and parsed.hostname and not parsed.username and not parsed.password:
                 homepage="https://"+parsed.hostname.lower().strip(".")+"/"
-        items[rank]={"company":company or "Fortune rank "+str(rank),
-                     "url":homepage,"fortune_rank":rank,
-                     "registry":"fortune500_2026",
-                     "domain_status":"available" if homepage else "missing_or_invalid"}
-    if len(items)!=500:
-        raise ValueError("Expected 500 Fortune ranks, got %d (source incomplete)."%len(items))
-    return [items[i] for i in range(1,501)]
+        entry={"company":company or "Fortune rank "+str(rank),
+               "url":homepage,"fortune_rank":rank,
+               "registry":"fortune500_2026",
+               "domain_status":"available" if homepage else "missing_or_invalid"}
+        # Upstream can repeat ranks. Keep the first complete row, but prefer
+        # a later row when it supplies the missing corporate homepage.
+        previous=items.get(rank)
+        if previous is None or (not previous["url"] and homepage):
+            items[rank]=entry
+    # A source with missing/duplicate ranks must still yield usable companies.
+    # Missing ranks are recorded by discovery rather than inventing names.
+    if not items:
+        raise ValueError("Fortune source contained no valid ranked companies")
+    return [items[i] for i in sorted(items)]
