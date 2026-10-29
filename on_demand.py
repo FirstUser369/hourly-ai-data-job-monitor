@@ -94,7 +94,13 @@ def safe_cell(value):
 
 
 def write_results(rows, checkpoint, source_label, report, failed):
-    rows.sort(key=lambda j: (j["status"].startswith("Published"), j["score"]), reverse=True)
+    # Experience preference takes precedence over recency and relevance score.
+    tiers={"experience: 3–4 years (highest priority)":4,
+           "experience: 0–2 years (included)":3,
+           "experience: 5 years (lower priority)":2,
+           "experience not specified":1}
+    rows.sort(key=lambda j: (tiers.get(j.get("experience"),0),
+                             j["status"].startswith("Published"), j["score"]), reverse=True)
     fields = ["company", "title", "location", "source", "published_utc", "first_seen_utc",
               "score", "experience", "relevance", "status", "apply_url"]
     with (OUTPUT / "jobs_since_last_run.csv").open("w", newline="", encoding="utf-8-sig") as out:
