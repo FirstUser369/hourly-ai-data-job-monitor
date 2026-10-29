@@ -159,6 +159,7 @@ def main():
     # Preserve missing-domain Fortune records as explicit unresolved entries.
     additional=[item for item in fortune if not item.get("url") or urlparse(item["url"]).hostname not in registered]
     missing_domains=[item for item in fortune if not item.get("url")]
+    missing_ranks=sorted(set(range(1,501))-{item["fortune_rank"] for item in fortune})
     all_companies=companies+additional
     with ThreadPoolExecutor(max_workers=16) as pool:
         results=list(pool.map(inspect_page,all_companies[:800]))
