@@ -13,6 +13,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
 
 import yaml
 import monitor
@@ -139,6 +140,15 @@ def write_results(rows, checkpoint, source_label, report, failed):
             safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
             safe_cell(row["experience"]),safe_cell(row["status"]),safe_cell(row["source"]),link
         ]) + " |")
+    counts=Counter(row["source"] for row in rows)
+    if counts:
+        lines.extend(["", "### Where these results came from", "",
+                      "| Source | Jobs in report |",
+                      "|---|---:|"])
+        for source,count in counts.most_common():
+            lines.append(f"| {safe_cell(source)} | {count} |")
+        lines.append("")
+        lines.append("These counts describe the current report, not the total jobs available on each site.")
     if not rows:
         lines.extend(["", "**No matching new openings found in the checked feeds.** "
                            "Check the feed-health section below; a successful scan does not guarantee exhaustive US coverage."])
