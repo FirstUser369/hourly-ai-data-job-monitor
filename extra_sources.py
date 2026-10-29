@@ -30,8 +30,8 @@ def remoteok(session):
 def himalayas(session):
     # Search several broad categories and multiple pages, not just exact titles.
     seen=set()
-    for query in ('data','machine learning','AI','analytics','platform engineer'):
-        for page in range(1,4):
+    for query in ('data','machine learning','AI','analytics','platform engineer','data science','MLOps'):
+        for page in range(1,7):
             data=get(session,'https://himalayas.app/jobs/api/search',
                      {'q':query,'country':'US','sort':'recent','page':page})
             jobs=data.get('jobs') or []
