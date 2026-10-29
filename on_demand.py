@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import yaml
 import monitor
 from github_watch import fetch_watchlist
+from wide_sources import jobicy, nomads, simplify
 
 NOW = datetime.now(timezone.utc)
 OUTPUT = Path("job_results")
@@ -157,6 +158,9 @@ def main():
     boards += [
         {"ats":"github_tracker","slug":"zapply","company":"Zapply GitHub tracker"},
         {"ats":"github_tracker","slug":"ml_tracker","company":"ML Newgrad GitHub tracker"},
+        {"ats":"jobicy","slug":"usa","company":"Jobicy US remote"},
+        {"ats":"workingnomads","slug":"all","company":"Working Nomads"},
+        {"ats":"github_simplify","slug":"newgrad","company":"SimplifyJobs New Grad Positions"},
     ]
     dedup={(b["ats"],b["slug"]):b for b in boards}
     boards=list(dedup.values())
@@ -173,6 +177,12 @@ def main():
         try:
             if board["ats"]=="github_tracker":
                 found=fetch_watchlist(board["slug"],monitor.SESSION)
+            elif board["ats"]=="jobicy":
+                found=jobicy(monitor.SESSION)
+            elif board["ats"]=="workingnomads":
+                found=nomads(monitor.SESSION)
+            elif board["ats"]=="github_simplify":
+                found=simplify(monitor.SESSION)
             else:
                 found=list(monitor.fetch(board))
             return board,found,None
