@@ -15,6 +15,20 @@ class Fortune2026Tests(unittest.TestCase):
         self.assertEqual(len(rows),500)
         self.assertEqual(rows[0]["url"],"https://company1.example/")
         self.assertEqual(rows[-1]["fortune_rank"],500)
+    def test_two_missing_domains_keep_entire_fortune_roster(self):
+        csv_rows=["rank,company,domain"]
+        for i in range(1,501):
+            domain="" if i in (177,499) else "company"+str(i)+".example"
+            csv_rows.append(str(i)+",Example "+str(i)+","+domain)
+        response=Mock(content=("\n".join(csv_rows)+"\n").encode())
+        session=Mock()
+        session.get.return_value=response
+        rows=f.load_fortune500(session)
+        self.assertEqual(len(rows),500)
+        self.assertEqual(sum(not x["url"] for x in rows),2)
+        self.assertEqual(rows[176]["domain_status"],"missing_or_invalid")
+        self.assertEqual(rows[498]["domain_status"],"missing_or_invalid")
+        self.assertEqual(rows[0]["domain_status"],"available")
     def test_reject_incomplete_source(self):
         response=Mock(content=b"rank,company,domain\n1,Company,example.com\n")
         session=Mock()
