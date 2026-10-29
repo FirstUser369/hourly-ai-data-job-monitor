@@ -13,11 +13,12 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
 
 import yaml
 import monitor
 from github_watch import fetch_watchlist
-from wide_sources import jobicy, nomads, simplify
+from wide_sources import jobicy, nomads, simplify, applyguy
 
 NOW = datetime.now(timezone.utc)
 OUTPUT = Path("job_results")
@@ -121,6 +122,7 @@ def write_results(rows, checkpoint, source_label, report, failed):
         f"**Previous checkpoint:** {monitor.iso(checkpoint) or 'None'} ({source_label})",
         f"**Results:** {len(rows)} unique matching roles · {published} employer-timestamped publications · {discovered} newly discovered or baseline listings",
         f"**Feeds:** {len(report)-len(failed)}/{len(report)} succeeded",
+        "**Note:** Newly discovered jobs can be older than this scan; GitHub tracker dates are not employer-verified.",
         "",
         "Jobs with employer publication timestamps are marked separately from listings **first discovered** by this monitor. "
         "A GitHub job list's posting age is not independent proof of an employer's original posting time. "
@@ -138,6 +140,15 @@ def write_results(rows, checkpoint, source_label, report, failed):
             safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
             safe_cell(row["experience"]),safe_cell(row["status"]),safe_cell(row["source"]),link
         ]) + " |")
+    counts=Counter(row["source"] for row in rows)
+    if counts:
+        lines.extend(["", "### Where these results came from", "",
+                      "| Source | Jobs in report |",
+                      "|---|---:|"])
+        for source,count in counts.most_common():
+            lines.append(f"| {safe_cell(source)} | {count} |")
+        lines.append("")
+        lines.append("These counts describe the current report, not the total jobs available on each site.")
     if not rows:
         lines.extend(["", "**No matching new openings found in the checked feeds.** "
                            "Check the feed-health section below; a successful scan does not guarantee exhaustive US coverage."])
@@ -167,6 +178,7 @@ def main():
         {"ats":"jobicy","slug":"usa","company":"Jobicy US remote"},
         {"ats":"workingnomads","slug":"all","company":"Working Nomads"},
         {"ats":"github_simplify","slug":"newgrad","company":"SimplifyJobs New Grad Positions"},
+        {"ats":"github_applyguy","slug":"newgrad2027","company":"ApplyGuy GitHub direct employer listings"},
     ]
     dedup={(b["ats"],b["slug"]):b for b in boards}
     boards=list(dedup.values())
@@ -189,6 +201,8 @@ def main():
                 found=nomads(monitor.SESSION)
             elif board["ats"]=="github_simplify":
                 found=simplify(monitor.SESSION)
+            elif board["ats"]=="github_applyguy":
+                found=applyguy(monitor.SESSION)
             else:
                 found=list(monitor.fetch(board))
             return board,found,None
