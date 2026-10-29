@@ -29,12 +29,36 @@ class Fortune2026Tests(unittest.TestCase):
         self.assertEqual(rows[176]["domain_status"],"missing_or_invalid")
         self.assertEqual(rows[498]["domain_status"],"missing_or_invalid")
         self.assertEqual(rows[0]["domain_status"],"available")
-    def test_reject_incomplete_source(self):
+    def test_partial_source_preserves_available_ranks(self):
         response=Mock(content=b"rank,company,domain\n1,Company,example.com\n")
         session=Mock()
         session.get.return_value=response
-        with self.assertRaisesRegex(ValueError,"Expected exactly 500"):
-            f.load_fortune500(session)
+        rows=f.load_fortune500(session)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["fortune_rank"],1)
+    def test_duplicate_rank_prefers_usable_homepage(self):
+        csv_rows=["rank,company,domain"]
+        for i in range(1,501):
+            csv_rows.append(str(i)+",Employer "+str(i)+",company"+str(i)+".example")
+        csv_rows.append("160,Employer 160,")
+        response=Mock(content=("\n".join(csv_rows)+"\n").encode())
+        session=Mock()
+        session.get.return_value=response
+        rows=f.load_fortune500(session)
+        self.assertEqual(len(rows),500)
+        self.assertEqual(rows[159]["url"],"https://company160.example/")
+    def test_missing_rank_is_not_fabricated(self):
+        lines=["rank,company,domain"]
+        for i in range(1,501):
+            if i==333:
+                continue
+            lines.append(str(i)+",Employer "+str(i)+",company"+str(i)+".example")
+        response=Mock(content=("\n".join(lines)+"\n").encode())
+        session=Mock()
+        session.get.return_value=response
+        rows=f.load_fortune500(session)
+        self.assertEqual(len(rows),499)
+        self.assertNotIn(333,[x["fortune_rank"] for x in rows])
     def test_career_anchor_discovery(self):
         html='<a href="/careers/">Careers</a><a href="/products">Products</a><a href="https://unrelated.example/jobs">jobs</a>'
         self.assertEqual(career_links(html,"https://example.com/"),["https://example.com/careers/"])
