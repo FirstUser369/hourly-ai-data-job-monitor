@@ -22,3 +22,13 @@ class WideSourcesTests(unittest.TestCase):
             with patch.object(w,"CACHE",path):
                 self.assertEqual(w.jobicy(session,datetime(2026,10,28,20,tzinfo=timezone.utc)),[])
             session.get.assert_not_called()
+
+    def test_applyguy_prefers_direct_employer_application(self):
+        sample={"jobs":[{"id":"abc","company":"Example","title":"Data Engineer",
+                 "location":"Boston, MA","posted":"2026-10-29",
+                 "url":"https://applyguy.ai/jobs?id=abc",
+                 "listingUrl":"https://job-boards.greenhouse.io/example/jobs/123"}]}
+        out=w.parse_applyguy(sample)
+        self.assertEqual(len(out),1)
+        self.assertEqual(out[0]["url"],"https://job-boards.greenhouse.io/example/jobs/123")
+        self.assertIsNone(out[0]["published"])
