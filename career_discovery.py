@@ -203,5 +203,7 @@ def main():
             handle.write(f"- Pages without visible public ATS: **{summary['no_public_ats_found']}**\n")
             handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n\n")
             handle.write("For per-company statuses, download career_discovery_report.json in this run's artifact.\n")
+    if fortune_error:
+        raise RuntimeError("Fortune 500 registry import failed; see career_discovery_report.json: "+fortune_error)
 if __name__=="__main__":
     main()
