@@ -1,19 +1,147 @@
-# Opt-in company career landing pages. Add employer official careers URLs here.
-# Discovery follows a landing page and finds PUBLIC linked ATS feeds.
-# Many JS-only career pages cannot be discovered automatically.
+# Candidate official career pages to discover public ATS boards.
+# Entries are NOT proof that an accessible job feed or live vacancies exist.
+# The manual discovery run reports which sites returned verified feeds.
 companies:
-  - {company: "Stripe", url: "https://stripe.com/jobs"}
-  - {company: "Datadog", url: "https://www.datadoghq.com/careers/"}
-  - {company: "Cloudflare", url: "https://www.cloudflare.com/careers/"}
-  - {company: "Figma", url: "https://www.figma.com/careers/"}
-  - {company: "Discord", url: "https://discord.com/jobs"}
-  - {company: "Coinbase", url: "https://www.coinbase.com/careers"}
-  - {company: "Duolingo", url: "https://careers.duolingo.com/"}
-  - {company: "MongoDB", url: "https://www.mongodb.com/company/careers"}
-  - {company: "Vercel", url: "https://vercel.com/careers"}
-  - {company: "Affirm", url: "https://www.affirm.com/careers"}
-  - {company: "Brex", url: "https://www.brex.com/careers"}
-  - {company: "Ramp", url: "https://ramp.com/careers"}
+  # Frontier AI and model platforms
   - {company: "OpenAI", url: "https://openai.com/careers/"}
-  - {company: "Replit", url: "https://replit.com/careers"}
+  - {company: "Anthropic", url: "https://www.anthropic.com/careers"}
   - {company: "Cohere", url: "https://cohere.com/careers"}
+  - {company: "Hugging Face", url: "https://huggingface.co/join"}
+  - {company: "Perplexity", url: "https://www.perplexity.ai/careers"}
+  - {company: "Scale AI", url: "https://scale.com/careers"}
+  - {company: "Together AI", url: "https://www.together.ai/careers"}
+  - {company: "Fireworks AI", url: "https://fireworks.ai/careers"}
+  - {company: "Anyscale", url: "https://www.anyscale.com/careers"}
+  - {company: "Modal", url: "https://modal.com/careers"}
+  - {company: "Replicate", url: "https://replicate.com/about"}
+  - {company: "Runway", url: "https://runwayml.com/careers"}
+  - {company: "ElevenLabs", url: "https://elevenlabs.io/careers"}
+  - {company: "Suno", url: "https://suno.com/careers"}
+  - {company: "Character.AI", url: "https://character.ai/careers"}
+  - {company: "Glean", url: "https://www.glean.com/careers"}
+  - {company: "Writer", url: "https://writer.com/careers"}
+  - {company: "Harvey", url: "https://www.harvey.ai/careers"}
+  - {company: "Sierra", url: "https://sierra.ai/careers"}
+  - {company: "Poolside", url: "https://www.poolside.ai/careers"}
+  - {company: "LangChain", url: "https://www.langchain.com/careers"}
+  - {company: "Pinecone", url: "https://www.pinecone.io/careers"}
+  - {company: "Weaviate", url: "https://weaviate.io/careers"}
+  - {company: "Weights & Biases", url: "https://wandb.ai/careers"}
+  - {company: "Cerebras", url: "https://www.cerebras.ai/careers"}
+  - {company: "Groq", url: "https://groq.com/careers"}
+  - {company: "SambaNova Systems", url: "https://sambanova.ai/careers/"}
+  - {company: "Lambda", url: "https://lambda.ai/careers"}
+  - {company: "CoreWeave", url: "https://www.coreweave.com/careers"}
+  - {company: "Crusoe", url: "https://www.crusoe.ai/careers"}
+  - {company: "Deepgram", url: "https://deepgram.com/careers"}
+  - {company: "AssemblyAI", url: "https://www.assemblyai.com/careers"}
+  - {company: "Hume AI", url: "https://www.hume.ai/careers"}
+  - {company: "Descript", url: "https://www.descript.com/careers"}
+  - {company: "Synthesia", url: "https://www.synthesia.io/careers"}
+  - {company: "Pika", url: "https://pika.art/careers"}
+  - {company: "Midjourney", url: "https://www.midjourney.com/careers"}
+  # Cloud, data and developer infrastructure
+  - {company: "Google", url: "https://www.google.com/about/careers/applications/"}
+  - {company: "Microsoft", url: "https://careers.microsoft.com/"}
+  - {company: "Amazon", url: "https://www.amazon.jobs/"}
+  - {company: "Apple", url: "https://jobs.apple.com/"}
+  - {company: "Meta", url: "https://www.metacareers.com/"}
+  - {company: "NVIDIA", url: "https://www.nvidia.com/en-us/about-nvidia/careers/"}
+  - {company: "AMD", url: "https://careers.amd.com/"}
+  - {company: "Intel", url: "https://jobs.intel.com/"}
+  - {company: "IBM", url: "https://www.ibm.com/careers"}
+  - {company: "Oracle", url: "https://www.oracle.com/careers/"}
+  - {company: "Salesforce", url: "https://careers.salesforce.com/"}
+  - {company: "Adobe", url: "https://careers.adobe.com/"}
+  - {company: "Databricks", url: "https://www.databricks.com/company/careers"}
+  - {company: "Snowflake", url: "https://careers.snowflake.com/"}
+  - {company: "Confluent", url: "https://careers.confluent.io/"}
+  - {company: "Datadog", url: "https://careers.datadoghq.com/"}
+  - {company: "Cloudflare", url: "https://www.cloudflare.com/careers/"}
+  - {company: "MongoDB", url: "https://www.mongodb.com/company/careers"}
+  - {company: "Elastic", url: "https://www.elastic.co/careers"}
+  - {company: "Grafana Labs", url: "https://grafana.com/about/careers/"}
+  - {company: "Redis", url: "https://redis.io/careers/"}
+  - {company: "Cockroach Labs", url: "https://www.cockroachlabs.com/careers/"}
+  - {company: "ClickHouse", url: "https://clickhouse.com/company/careers"}
+  - {company: "dbt Labs", url: "https://www.getdbt.com/about-us/careers"}
+  - {company: "Fivetran", url: "https://www.fivetran.com/careers"}
+  - {company: "Airbyte", url: "https://airbyte.com/company/careers"}
+  - {company: "Astronomer", url: "https://www.astronomer.io/careers/"}
+  - {company: "Starburst", url: "https://www.starburst.io/careers/"}
+  - {company: "Hightouch", url: "https://hightouch.com/careers"}
+  - {company: "Vercel", url: "https://vercel.com/careers"}
+  - {company: "Netlify", url: "https://www.netlify.com/careers/"}
+  - {company: "GitHub", url: "https://www.github.careers/careers-home"}
+  - {company: "GitLab", url: "https://about.gitlab.com/jobs/"}
+  - {company: "HashiCorp", url: "https://www.hashicorp.com/careers"}
+  - {company: "Twilio", url: "https://www.twilio.com/en-us/company/jobs"}
+  - {company: "Stripe", url: "https://stripe.com/jobs"}
+  - {company: "Plaid", url: "https://plaid.com/careers/"}
+  - {company: "Ramp", url: "https://ramp.com/careers"}
+  - {company: "Brex", url: "https://www.brex.com/careers"}
+  - {company: "Rippling", url: "https://www.rippling.com/careers"}
+  - {company: "Figma", url: "https://www.figma.com/careers/"}
+  # Consumer platforms, fintech and marketplaces
+  - {company: "Uber", url: "https://www.uber.com/us/en/careers/"}
+  - {company: "Lyft", url: "https://www.lyft.com/careers"}
+  - {company: "Airbnb", url: "https://careers.airbnb.com/"}
+  - {company: "DoorDash", url: "https://careers.doordash.com/"}
+  - {company: "Instacart", url: "https://instacart.careers/"}
+  - {company: "Pinterest", url: "https://www.pinterestcareers.com/"}
+  - {company: "Reddit", url: "https://www.redditinc.com/careers"}
+  - {company: "Discord", url: "https://discord.com/jobs"}
+  - {company: "Roblox", url: "https://careers.roblox.com/"}
+  - {company: "Spotify", url: "https://www.lifeatspotify.com/jobs"}
+  - {company: "Netflix", url: "https://jobs.netflix.com/"}
+  - {company: "Duolingo", url: "https://careers.duolingo.com/"}
+  - {company: "Snap", url: "https://careers.snap.com/"}
+  - {company: "TikTok", url: "https://careers.tiktok.com/"}
+  - {company: "Coinbase", url: "https://www.coinbase.com/careers"}
+  - {company: "Robinhood", url: "https://careers.robinhood.com/"}
+  - {company: "Block", url: "https://block.xyz/careers"}
+  - {company: "PayPal", url: "https://careers.pypl.com/"}
+  - {company: "Affirm", url: "https://www.affirm.com/careers"}
+  - {company: "Chime", url: "https://www.chime.com/careers/"}
+  - {company: "Capital One", url: "https://www.capitalonecareers.com/"}
+  - {company: "JPMorgan Chase", url: "https://careers.jpmorgan.com/"}
+  - {company: "Visa", url: "https://corporate.visa.com/en/careers.html"}
+  - {company: "Mastercard", url: "https://careers.mastercard.com/"}
+  - {company: "American Express", url: "https://www.americanexpress.com/en-us/careers/"}
+  - {company: "Intuit", url: "https://www.intuit.com/careers/"}
+  - {company: "ServiceNow", url: "https://careers.servicenow.com/"}
+  - {company: "Atlassian", url: "https://www.atlassian.com/company/careers"}
+  - {company: "HubSpot", url: "https://www.hubspot.com/careers"}
+  - {company: "Asana", url: "https://asana.com/jobs"}
+  # Autonomy, robotics, security and enterprise AI
+  - {company: "Waymo", url: "https://waymo.com/careers/"}
+  - {company: "Zoox", url: "https://zoox.com/careers/"}
+  - {company: "Aurora Innovation", url: "https://aurora.tech/careers"}
+  - {company: "Nuro", url: "https://www.nuro.ai/careers"}
+  - {company: "Tesla", url: "https://www.tesla.com/careers"}
+  - {company: "Anduril", url: "https://www.anduril.com/careers"}
+  - {company: "Skydio", url: "https://www.skydio.com/careers"}
+  - {company: "Shield AI", url: "https://shield.ai/careers/"}
+  - {company: "Figure AI", url: "https://www.figure.ai/careers"}
+  - {company: "Boston Dynamics", url: "https://bostondynamics.com/careers/"}
+  - {company: "Agility Robotics", url: "https://www.agilityrobotics.com/careers"}
+  - {company: "Applied Intuition", url: "https://www.appliedintuition.com/careers"}
+  - {company: "Scale Computing", url: "https://www.scalecomputing.com/about/careers"}
+  - {company: "Palantir", url: "https://www.palantir.com/careers/"}
+  - {company: "C3 AI", url: "https://c3.ai/careers/"}
+  - {company: "Dataiku", url: "https://www.dataiku.com/careers/"}
+  - {company: "Alteryx", url: "https://www.alteryx.com/about-us/careers"}
+  - {company: "SAS", url: "https://www.sas.com/en_us/careers.html"}
+  - {company: "CrowdStrike", url: "https://www.crowdstrike.com/careers/"}
+  - {company: "SentinelOne", url: "https://www.sentinelone.com/careers/"}
+  - {company: "Palo Alto Networks", url: "https://jobs.paloaltonetworks.com/"}
+  - {company: "Zscaler", url: "https://www.zscaler.com/careers"}
+  - {company: "Okta", url: "https://www.okta.com/company/careers/"}
+  - {company: "Wiz", url: "https://www.wiz.io/careers"}
+  - {company: "Vanta", url: "https://www.vanta.com/careers"}
+  - {company: "Samsara", url: "https://www.samsara.com/company/careers"}
+  - {company: "Relativity", url: "https://www.relativity.com/company/careers/"}
+  - {company: "Tempus AI", url: "https://www.tempus.com/careers/"}
+  - {company: "Recursion", url: "https://www.recursion.com/careers"}
+  - {company: "Insitro", url: "https://insitro.com/careers"}
+  - {company: "Benchling", url: "https://www.benchling.com/careers"}

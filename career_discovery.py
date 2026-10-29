@@ -4,9 +4,11 @@ This is a bounded and opt-in company registry, NOT an internet-wide crawler.
 Does not bypass login, robots restrictions, or JS security controls.
 """
 import json
+import os
 import logging
 import re
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 import ipaddress
 import requests
@@ -84,44 +86,74 @@ def validate_public_feed(session,board):
     except (requests.RequestException,ValueError):
         return False
 
+def inspect_page(record):
+    company=str(record.get("company") or "").strip()
+    url=str(record.get("url") or "").strip()
+    if not company or not safe_url(url):
+        return [],{"company":company,"url":url,"status":"invalid_input","verified_feed_count":0}
+    session=requests.Session()
+    session.headers["User-Agent"]=USER_AGENT
+    try:
+        # Independent sessions per worker; bound redirects/response size and request time.
+        resp=session.get(url,timeout=(6,16),allow_redirects=True)
+        resp.raise_for_status()
+        if not safe_url(resp.url):
+            raise ValueError("unsafe redirect")
+        if len(resp.content)>2_000_000:
+            raise ValueError("HTML landing page too large")
+        potential=parse_careers_html(resp.text,resp.url,company)
+        verified=[board for board in potential if validate_public_feed(session,board)]
+        return verified,{"company":company,"url":url,"status":"verified_feed" if verified else "no_public_ats_found",
+                         "potential_feeds":len(potential),"verified_feed_count":len(verified)}
+    except (requests.RequestException,ValueError,TypeError) as err:
+        logging.warning("Career page %s: %s",company,type(err).__name__)
+        return [],{"company":company,"url":url,"status":"failed","error":type(err).__name__,
+                   "verified_feed_count":0}
+    finally:
+        session.close()
+
 def main():
     registry=Path("career_pages.yml")
     if not registry.exists():
-        raise SystemExit("Add employer careers pages in career_pages.yml")
+        raise SystemExit("Missing career_pages.yml")
     companies=(yaml.safe_load(registry.read_text(encoding="utf-8")) or {}).get("companies",[])
-    session=requests.Session()
-    session.headers["User-Agent"]=USER_AGENT
+    if not isinstance(companies,list):
+        raise ValueError("companies must be a list")
+    # More than 100 companies can be checked on a manual run without serial waits.
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        results=list(pool.map(inspect_page,companies[:200]))
     confirmed={}
     report=[]
-    for record in companies[:100]:
-        company=str(record.get("company") or "").strip()
-        url=str(record.get("url") or "").strip()
-        if not company or not safe_url(url):
-            report.append({"company":company,"status":"invalid input"})
-            continue
-        try:
-            response=session.get(url,timeout=(8,20),allow_redirects=True)
-            response.raise_for_status()
-            if not safe_url(response.url):
-                raise ValueError("unsafe redirect target")
-            if len(response.content)>2_000_000:
-                raise ValueError("career landing page too large")
-            matches=parse_careers_html(response.text,response.url,company)
-            for board in matches:
-                if validate_public_feed(session,board):
-                    confirmed[(board["ats"],board["slug"])]=board
-            report.append({"company":company,"status":"checked","candidates":len(matches)})
-        except (requests.RequestException,ValueError) as exc:
-            logging.warning("Career page failed %s: %s",company,type(exc).__name__)
-            report.append({"company":company,"status":"failed","error":type(exc).__name__})
-    # No failed discovery should wipe previously validated entries.
+    for boards,entry in results:
+        report.append(entry)
+        for board in boards:
+            confirmed[(board["ats"],board["slug"])]=board
+    newly_verified=len(confirmed)
+    # A transient inaccessible careers site never erases a previously verified feed.
     output=Path("discovered_boards.yml")
     old=(yaml.safe_load(output.read_text(encoding="utf-8")) or {}).get("boards",[]) if output.exists() else []
+    if not isinstance(old,list):
+        old=[]
     for board in old:
         if board.get("ats") in ALLOWED.values() and SLUG.fullmatch(str(board.get("slug") or "")):
             confirmed.setdefault((board["ats"],board["slug"]),board)
     output.write_text(yaml.safe_dump({"boards":list(confirmed.values())},sort_keys=False),encoding="utf-8")
-    Path("career_discovery_report.json").write_text(json.dumps({"configured_pages":len(companies),"validated_boards":len(confirmed),"pages":report},indent=2),encoding="utf-8")
-    print(f"Checked {len(companies)} configured career pages; {len(confirmed)} validated discovered boards.")
+    summary={"configured_pages":len(companies),"checked_pages":len(report),"verified_this_run":newly_verified,
+             "validated_boards_total":len(confirmed),
+             "no_public_ats_found":sum(x["status"]=="no_public_ats_found" for x in report),
+             "failed_pages":sum(x["status"]=="failed" for x in report),"pages":report}
+    Path("career_discovery_report.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
+    print("Career discovery: %s pages checked; %s verified ATS feeds found; %s total known; %s failed" %
+          (len(report),newly_verified,len(confirmed),summary["failed_pages"]))
+    summary_file=os.getenv("GITHUB_STEP_SUMMARY")
+    if summary_file:
+        with open(summary_file,"a",encoding="utf-8") as handle:
+            handle.write("\n### Employer career-page discovery\n\n")
+            handle.write(f"- Candidate employer pages checked: **{len(report)}**\n")
+            handle.write(f"- Public ATS feeds validated this run: **{newly_verified}**\n")
+            handle.write(f"- Validated feeds retained in registry: **{len(confirmed)}**\n")
+            handle.write(f"- Pages without visible public ATS: **{summary['no_public_ats_found']}**\n")
+            handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n\n")
+            handle.write("For per-company statuses, download career_discovery_report.json in this run's artifact.\n")
 if __name__=="__main__":
     main()
