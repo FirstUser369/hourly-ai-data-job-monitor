@@ -61,3 +61,11 @@ To check them, click **Actions → Find AI/Data jobs since my last run → Run w
 ## Additional employer-direct GitHub discovery
 
 The manual finder also reads [ApplyGuy/2027-New-Grad-Jobs](https://github.com/ApplyGuy/2027-New-Grad-Jobs) via its public structured JSON listing, preferring `listingUrl` (employer application) over the aggregator's intermediary link. The tracker-reported posting date is kept separate and is **not** treated as employer-verified publication time. This expands coverage to Workday and other employer systems without scraping gated pages. The run Summary includes a per-source result count to reveal when any single provider (such as Himalayas) dominates the results.
+
+## Fortune 500 (2026) company career discovery
+
+In addition to the 139 AI-focused candidate career pages, the optional discovery step now loads **all 500 companies** from a published 2026 Fortune 500 company/domain dataset (Installmap, September 2026, CC BY 4.0), deduplicates homepage domains, and attempts to follow **real careers links** exposed on those company homepages. The dataset citation and import errors are recorded in `career_discovery_report.json`. Data source: https://installmap.com/static/data/fortune-100-ai-homepage/fortune500.csv ; original ranking: https://fortune.com/ranking/fortune500/.
+
+The manual workflow's checkbox **Discover AI companies + Fortune 500 (2026) public career feeds before searching** defaults to enabled. It checks up to 800 combined pages with 16 parallel workers. This does *not* mean that 500 independent jobs feeds have been verified: individual sites may use Workday, custom JavaScript career portals or an application-wall; only publicly linked and validated Greenhouse, Lever, Ashby and SmartRecruiters boards are added to `discovered_boards.yml`. The main latest-only search still limits results to direct **Greenhouse, Ashby and SmartRecruiters** feeds that supply employer publication timestamps within 48 hours and reachable job-specific pages. Additional ATS connectors are required for broad Fortune 500 job coverage.
+
+If the Fortune dataset is inaccessible or malformed, discovery shows an import failure rather than silently treating fewer companies as 500. The public source list is loaded during the run, not copied or fabricated as career URLs.
