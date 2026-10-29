@@ -156,7 +156,9 @@ def main():
         fortune_error=type(exc).__name__+": "+str(exc)
         logging.error("Fortune 500 import unavailable: %s",fortune_error)
     registered={urlparse(str(item.get("url") or "")).hostname for item in companies}
-    additional=[item for item in fortune if urlparse(item["url"]).hostname not in registered]
+    # Preserve missing-domain Fortune records as explicit unresolved entries.
+    additional=[item for item in fortune if not item.get("url") or urlparse(item["url"]).hostname not in registered]
+    missing_domains=[item for item in fortune if not item.get("url")]
     all_companies=companies+additional
     with ThreadPoolExecutor(max_workers=16) as pool:
         results=list(pool.map(inspect_page,all_companies[:800]))
@@ -179,11 +181,14 @@ def main():
     summary={"configured_pages":len(companies),"fortune500_year":2026,"fortune500_source":FORTUNE_SOURCE,
              "fortune500_credit":FORTUNE_CREDIT,"fortune500_loaded":len(fortune),
              "fortune500_error":fortune_error,"fortune500_added":len(additional),
+             "fortune500_domain_unresolved":len(missing_domains),
+             "fortune500_missing_companies":[{"rank":item["fortune_rank"],"company":item["company"]} for item in missing_domains],
              "total_candidates":len(all_companies),"checked_pages":len(report),"verified_this_run":newly_verified,
              "validated_boards_total":len(confirmed),
              "no_public_ats_found":sum(x["status"]=="no_public_ats_found" for x in report),
              "failed_pages":sum(x["status"]=="failed" for x in report),"pages":report}
     Path("career_discovery_report.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
+    print("Fortune roster: %s/500 entries; %s missing/invalid domains" % (len(fortune),len(missing_domains)))
     print("Career discovery: %s pages checked; %s verified ATS feeds found; %s total known; %s failed" %
           (len(report),newly_verified,len(confirmed),summary["failed_pages"]))
     summary_file=os.getenv("GITHUB_STEP_SUMMARY")
@@ -191,11 +196,14 @@ def main():
         with open(summary_file,"a",encoding="utf-8") as handle:
             handle.write("\n### Employer career-page discovery\n\n")
             handle.write(f"- Candidate employer pages checked: **{len(report)}**\n")
-            handle.write(f"- Fortune 500 companies loaded: **{len(fortune)}/500**\n")
+            handle.write(f"- Fortune 500 roster entries loaded: **{len(fortune)}/500**\n")
+            handle.write(f"- Fortune 500 entries with no usable official homepage: **{len(missing_domains)}**\n")
             handle.write(f"- Public ATS feeds validated this run: **{newly_verified}**\n")
             handle.write(f"- Validated feeds retained in registry: **{len(confirmed)}**\n")
             handle.write(f"- Pages without visible public ATS: **{summary['no_public_ats_found']}**\n")
             handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n\n")
             handle.write("For per-company statuses, download career_discovery_report.json in this run's artifact.\n")
+    if fortune_error:
+        raise RuntimeError("Fortune 500 registry import failed; see career_discovery_report.json: "+fortune_error)
 if __name__=="__main__":
     main()
