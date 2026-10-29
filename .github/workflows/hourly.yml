@@ -3,10 +3,10 @@ on:
   workflow_dispatch:
     inputs:
       discover_career_pages:
-        description: 'Update public employer career feeds before searching'
+        description: 'Discover AI companies + Fortune 500 (2026) public career feeds before searching'
         type: boolean
         required: false
-        default: false
+        default: true
 permissions:
   contents: write
 concurrency:
@@ -16,7 +16,7 @@ jobs:
   find-jobs:
     name: Find jobs and build results
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
         with:
