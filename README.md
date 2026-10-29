@@ -30,7 +30,7 @@ A previously seen job is normally suppressed; unique identities are tracked in S
 
 ## Matching preferences
 
-Target US and US-eligible remote roles in AI, ML, applied AI, LLMs, data science, data engineering, analytics, BI, MLOps, and adjacent software/platform work. Preference is ~2–5 years, with missing years allowed; internship, staff, principal and director roles are excluded. The relevance matcher uses title + description where available and scores the best matches first.
+Target US and US-eligible remote roles in AI, ML, applied AI, LLMs, data science, data engineering, analytics, BI, MLOps, and adjacent software/platform work. Experience priority: **3–4 years first**, **0–2 years included**, **5 years included at lower priority**, and **6+ years excluded whenever explicitly stated**. Jobs without a stated requirement remain eligible but are labeled **experience not specified**. Ranges are evaluated using their upper bound (e.g., 3–6 is excluded). Internship, staff, principal and director roles remain excluded. The relevance matcher uses title + description where available, prioritizes the target experience band, and scores the best matches first. The results table and downloaded CSV include an experience classification.
 
 GitHub sources:
 - [SimplifyJobs/New-Grad-Positions](https://github.com/SimplifyJobs/New-Grad-Positions): reads open five-column HTML job tables and prefers direct application URLs; the source targets new graduates, and older/internship roles are still filtered by our relevance model.
