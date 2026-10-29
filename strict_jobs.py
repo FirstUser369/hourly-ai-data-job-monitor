@@ -19,10 +19,7 @@ def recent_employer_post(job, now, checkpoint=None, existing_published=None):
         return False
     if posted>now or now-posted>MAX_AGE:
         return False
-    if checkpoint and posted<=checkpoint:
-        return False
-    if existing_published and existing_published>=posted:
-        return False
+    # Rolling 48h dashboard: previously seen but still current jobs stay visible.
     return True
 
 def verify_application(job,session=None):
