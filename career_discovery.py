@@ -4,6 +4,7 @@ This is a bounded and opt-in company registry, NOT an internet-wide crawler.
 Does not bypass login, robots restrictions, or JS security controls.
 """
 import json
+import os
 import logging
 import re
 from pathlib import Path
@@ -144,5 +145,15 @@ def main():
     Path("career_discovery_report.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
     print("Career discovery: %s pages checked; %s verified ATS feeds found; %s total known; %s failed" %
           (len(report),newly_verified,len(confirmed),summary["failed_pages"]))
+    summary_file=os.getenv("GITHUB_STEP_SUMMARY")
+    if summary_file:
+        with open(summary_file,"a",encoding="utf-8") as handle:
+            handle.write("\n### Employer career-page discovery\n\n")
+            handle.write(f"- Candidate employer pages checked: **{len(report)}**\n")
+            handle.write(f"- Public ATS feeds validated this run: **{newly_verified}**\n")
+            handle.write(f"- Validated feeds retained in registry: **{len(confirmed)}**\n")
+            handle.write(f"- Pages without visible public ATS: **{summary['no_public_ats_found']}**\n")
+            handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n\n")
+            handle.write("For per-company statuses, download career_discovery_report.json in this run's artifact.\n")
 if __name__=="__main__":
     main()
