@@ -31,20 +31,25 @@ def load_fortune500(session=None):
         rank=get(row,"rank","fortune_rank","fortune_500_rank")
         company=get(row,"company","name","company_name")
         domain=get(row,"domain","website","url","final_url")
-        if not rank.isdecimal() or not (1<=int(rank)<=500) or not company:
+        if not rank.isdecimal() or not (1<=int(rank)<=500):
             continue
-        domain=domain.strip()
-        if not domain:
-            continue
-        if "://" not in domain:
-            domain="https://"+domain
-        parsed=urlparse(domain)
-        if parsed.scheme!="https" or not parsed.hostname or parsed.username or parsed.password:
-            continue
-        # Visit just the official root, not a stale recorded final-url path.
-        homepage="https://"+parsed.hostname.lower().strip(".")+"/"
-        items[int(rank)]={"company":company,"url":homepage,"fortune_rank":int(rank),
-                          "registry":"fortune500_2026"}
+        rank=int(rank)
+        if rank in items:
+            raise ValueError("Duplicate Fortune rank %d"%rank)
+        # Preserve the company's roster entry even when the source has no
+        # company domain. Missing domains must not hide the other 498.
+        homepage=""
+        if domain:
+            domain=domain.strip()
+            if "://" not in domain:
+                domain="https://"+domain
+            parsed=urlparse(domain)
+            if parsed.scheme=="https" and parsed.hostname and not parsed.username and not parsed.password:
+                homepage="https://"+parsed.hostname.lower().strip(".")+"/"
+        items[rank]={"company":company or "Fortune rank "+str(rank),
+                     "url":homepage,"fortune_rank":rank,
+                     "registry":"fortune500_2026",
+                     "domain_status":"available" if homepage else "missing_or_invalid"}
     if len(items)!=500:
-        raise ValueError("Expected exactly 500 ranks with company+domain; got %d. Check upstream CSV columns."%len(items))
+        raise ValueError("Expected 500 Fortune ranks, got %d (source incomplete)."%len(items))
     return [items[i] for i in range(1,501)]
