@@ -216,7 +216,8 @@ def main():
                     valid,verification=verify_application(job)
                     if not valid:
                         closed_or_unverified+=1
-                        status=None
+                        # Retry unverifiable applications next run; do not mark as seen.
+                        continue
                 first_seen=current[0] if current else monitor.iso(NOW)
                 published=monitor.iso(job.get("published"))
                 db.execute("""INSERT INTO jobs(key,company,title,location,url,published,first_seen,last_seen,alerted)
