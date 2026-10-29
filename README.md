@@ -2,6 +2,14 @@
 
 **No automatic hourly runs. No job-alert emails.** Click **Run workflow** whenever you want to see jobs added since your previous run.
 
+## Strict latest-jobs mode (current default)
+
+**Accuracy over quantity.** The job table/CSV now includes only posts present in a current public **Greenhouse, Ashby, or SmartRecruiters** employer feed, with a usable employer publication timestamp in the **previous 48 hours**, newer than the last successful manual-run checkpoint, and an application URL that returns a working, job-specific public page. HTTP errors, generic career-page redirects, and pages signaling that a position is closed are excluded. Links blocked by a website (403, challenge, timeout) are **unverified and excluded**, not represented as open.
+
+**Why results may be smaller:** GitHub repositories, Himalayas, Jobicy, Remote OK, Working Nomads, Lever, and other third-party or undated listings are no longer eligible for the main results. Their data can remain available in source adapters for future opt-in research, but discovery time and tracker labels do not establish that a job was published recently or remains open. Some genuine new jobs with no employer publication time or with anti-bot application pages will be missed. A working page is not an absolute guarantee of availability at the moment you apply.
+
+The 139 employer career URLs are **discovery candidates**, not directly verified active job feeds. Enable optional discovery when running to add publicly validated ATS boards. The run Summary shows per-source counts of **verified jobs**.
+
 ## How to run it
 
 1. Go to **Actions → Find AI/Data jobs since my last run** in this repository.
@@ -13,20 +21,17 @@
    - `job_results/results_summary.md` — the table as Markdown
    - `job_results/feed_health.json` — failures and source counts
 
-The scan includes **Greenhouse, Lever, Ashby, SmartRecruiters, Remote OK, Himalayas, Arbeitnow, Jobicy, Working Nomads, SimplifyJobs/New-Grad-Positions, and two GitHub job trackers**, plus any employer boards discovered from `career_pages.yml`.
+The strict results scan includes **Greenhouse, Ashby, SmartRecruiters**, plus compatible employer boards discovered from `career_pages.yml`. Other source adapters are retained in the repository but not used for latest-jobs results.
 
 ## What "since the last run" actually means
 
 The monitor saves a last-successful-manual-run timestamp in the existing private `jobs.sqlite3` file. On the first run after upgrading, it uses the latest timestamp from the older job-monitor database. On each subsequent successful run, the checkpoint advances.
 
-Results have **honest recency labels**:
-- **Published since last run (employer timestamp)**: a trusted employer feed explicitly reports a publication time later than the previous checkpoint; when reposted, this may reflect a subsequent release.
-- **GitHub tracker reports posted since last run (unverified)**: the GitHub source reports an age of minutes, hours, days, or weeks, indicating an approximate posting time within the selected interval. This is not independently verified.
-- **Newly discovered since last run (publication time unknown)**: absent from the saved job history, with no reliable original posting timestamp. These roles may actually have existed earlier.
+Results show **Employer-published in last 48 hours** only, after independently checking the reachable application page. Unknown publication dates and stale discoveries are excluded.
 
-A previously seen job is normally suppressed; unique identities are tracked in SQLite and duplicate company/role/location combinations are removed within each report. The full list is stored in CSV/JSON; the GitHub run Summary shows the first 180. Expanding sources can cause a one-time batch of previously unseen but older jobs, which are labeled **newly discovered (publication time unknown)** rather than published since the previous run.
+A previously seen job is normally suppressed; unique identities are tracked in SQLite and duplicate company/role/location combinations are removed within each report. The full list is stored in CSV/JSON; the GitHub run Summary shows the first 180. Newly discovered older jobs never enter the latest-jobs list.
 
-**First-time setup:** If no earlier history exists, the initial run displays a baseline of current matching listings and labels the date limitation rather than calling them newly posted. The first run after this upgrade can include all jobs in newly added GitHub feeds. If a feed fails, the scan reports the failure and does not move the global checkpoint, so a later run can recover skipped publications.
+**First-time setup:** If no earlier history exists, the initial run includes only matching employer publications from the prior 48 hours that pass link verification. The first run after this upgrade can include all jobs in newly added GitHub feeds. If a feed fails, the scan reports the failure and does not move the global checkpoint, so a later run can recover skipped publications.
 
 ## Matching preferences
 
