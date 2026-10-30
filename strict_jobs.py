@@ -22,13 +22,13 @@ def recent_employer_post(job, now, checkpoint=None, existing_published=None):
     # Rolling 48h dashboard: previously seen but still current jobs stay visible.
     return True
 
-def verify_application(job,session=None):
+def verify_application(job,session=None,allow_aggregators=False):
     """Active public ATS presence plus reachable job-specific application page.
 
     Rejected when blocked or ambiguous: an HTTP 200 alone is insufficient if
     the destination is a generic company careers page or displays closed text.
     """
-    if job.get("ats") not in TRUSTED:
+    if job.get("ats") not in TRUSTED and not allow_aggregators:
         return False,"not employer ATS"
     url=str(job.get("url") or "")
     parts=urlparse(url)
