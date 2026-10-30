@@ -2,13 +2,15 @@
 
 **No automatic hourly runs. No job-alert emails.** Click **Run workflow** whenever you want to see jobs added since your previous run.
 
-## Strict latest-jobs mode (current default)
+## Current behavior: balanced sources, STRICT since-last-run interval
 
-**Accuracy over quantity.** The job table/CSV now includes only posts present in a current public **Greenhouse, Ashby, or SmartRecruiters** employer feed, with a usable employer publication timestamp in the **previous 48 hours**, newer than the last successful manual-run checkpoint, and an application URL that returns a working, job-specific public page. HTTP errors, generic career-page redirects, and pages signaling that a position is closed are excluded. Links blocked by a website (403, challenge, timeout) are **unverified and excluded**, not represented as open.
+Each manual run compares source time evidence against the timestamp saved by the **previous completed manual search**. Only source times strictly after that checkpoint and no later than this scan can qualify. Previously seen 1–2-day-old jobs are **not repeated** merely because they remain online. Discovering an old listing for the first time is not evidence that it was newly posted.
 
-**Why results may be smaller:** GitHub repositories, Himalayas, Jobicy, Remote OK, Working Nomads, Lever, and other third-party or undated listings are no longer eligible for the main results. Their data can remain available in source adapters for future opt-in research, but discovery time and tracker labels do not establish that a job was published recently or remains open. Some genuine new jobs with no employer publication time or with anti-bot application pages will be missed. A working page is not an absolute guarantee of availability at the moment you apply.
+All supported sources are queried: public Greenhouse, Lever, Ashby and SmartRecruiters employer APIs, remote boards (including Himalayas, Remote OK, Jobicy, Arbeitnow and Working Nomads), and public GitHub job trackers (Zapply, ML Newgrad, Simplify and ApplyGuy). A source needs a usable timestamp or sufficiently precise approximate-age label to qualify. Undated jobs are excluded rather than misrepresented as new.
 
-The 139 employer career URLs are **discovery candidates**, not directly verified active job feeds. Enable optional discovery when running to add publicly validated ATS boards. The run Summary shows per-source counts of **verified jobs**.
+The workflow Summary separates **employer-timestamped**, **third-party-reported** and **Himalayas recently updated** listings. The last category is **NOT confirmation that the job was originally posted since the previous scan**: Himalayas `pubDate` reports last update. GitHub minute/hour labels and other third-party date claims are not independently verified. Each entry includes an application URL that must pass a public link check, or for Himalayas, the provider's official live-job API check. Blocked or uncertain links fail closed. Availability can change after the scan.
+
+The Summary round-robins sources so one job board doesn't dominate the first page; the CSV/JSON contain **every qualifying nonduplicate result** without arbitrary per-provider quotas. Your preferred experience priority remains 3–4 years first, then 0–2, then 5; explicit 6+ year requirements excluded. If a job doesn't state a requirement, its experience is marked unspecified.
 
 ## How to run it
 
@@ -21,17 +23,11 @@ The 139 employer career URLs are **discovery candidates**, not directly verified
    - `job_results/results_summary.md` — the table as Markdown
    - `job_results/feed_health.json` — failures and source counts
 
-The strict results scan includes **Greenhouse, Ashby, SmartRecruiters**, plus compatible employer boards discovered from `career_pages.yml`. Other source adapters are retained in the repository but not used for latest-jobs results.
+The scan includes the direct employer boards and supplementary remote/GitHub feeds listed above; the optional discovery step adds validated company ATS boards.
 
-## What "since the last run" actually means
+## What counts as new
 
-The monitor saves a last-successful-manual-run timestamp in the existing private `jobs.sqlite3` file. On the first run after upgrading, it uses the latest timestamp from the older job-monitor database. On each subsequent successful run, the checkpoint advances.
-
-Results show **Employer-published in last 48 hours** only, after independently checking the reachable application page. Unknown publication dates and stale discoveries are excluded.
-
-A previously seen job is normally suppressed; unique identities are tracked in SQLite and duplicate company/role/location combinations are removed within each report. The full list is stored in CSV/JSON; the GitHub run Summary shows the first 180. Newly discovered older jobs never enter the latest-jobs list.
-
-**First-time setup:** If no earlier history exists, the initial run includes only matching employer publications from the prior 48 hours that pass link verification. The first run after this upgrade can include all jobs in newly added GitHub feeds. If a feed fails, the scan reports the failure and does not move the global checkpoint, so a later run can recover skipped publications.
+The run uses the previous completed scan timestamp, not a rolling 48-hour window. Freshness source labels and application status checks are reported separately. **No previous checkpoint** means no posting can be labeled as posted *since* a previous run; run once to establish the baseline. Failed feeds are reported, but a completed search advances the checkpoint so jobs from healthy feeds are not repeated in later runs. If a provider fails, its jobs may be missed until their timestamps fall inside a subsequent requested interval; the workflow does not invent time evidence.
 
 ## Matching preferences
 
@@ -66,7 +62,7 @@ The manual finder also reads [ApplyGuy/2027-New-Grad-Jobs](https://github.com/Ap
 
 In addition to the 139 AI-focused candidate career pages, the optional discovery step now loads **all 500 companies** from a published 2026 Fortune 500 company/domain dataset (Installmap, September 2026, CC BY 4.0), deduplicates homepage domains, and attempts to follow **real careers links** exposed on those company homepages. The dataset citation and import errors are recorded in `career_discovery_report.json`. Data source: https://installmap.com/static/data/fortune-100-ai-homepage/fortune500.csv ; original ranking: https://fortune.com/ranking/fortune500/.
 
-The manual workflow's checkbox **Discover AI companies + Fortune 500 (2026) public career feeds before searching** defaults to enabled. It checks up to 800 combined pages with 16 parallel workers. This does *not* mean that 500 independent jobs feeds have been verified: individual sites may use Workday, custom JavaScript career portals or an application-wall; only publicly linked and validated Greenhouse, Lever, Ashby and SmartRecruiters boards are added to `discovered_boards.yml`. The main latest-only search still limits results to direct **Greenhouse, Ashby and SmartRecruiters** feeds that supply employer publication timestamps within 48 hours and reachable job-specific pages. Additional ATS connectors are required for broad Fortune 500 job coverage.
+The manual workflow's checkbox **Discover AI companies + Fortune 500 (2026) public career feeds before searching** defaults to enabled. It checks up to 800 combined pages with 16 parallel workers. This does *not* mean that 500 independent jobs feeds have been verified: individual sites may use Workday, custom JavaScript career portals or an application-wall; only publicly linked and validated Greenhouse, Lever, Ashby and SmartRecruiters boards are added to `discovered_boards.yml`. Company discovery validates public ATS feeds. Fortune 500 Workday and custom portals may still need additional adapters; a discovered company is not automatically a live, searchable job feed.
 
 If the Fortune dataset is inaccessible or malformed, discovery shows an import failure rather than silently treating fewer companies as 500. The public source list is loaded during the run, not copied or fabricated as career URLs.
 
@@ -74,8 +70,7 @@ If the Fortune dataset is inaccessible or malformed, discovery shows an import f
 
 The published 2026 Fortune 500 dataset can contain all 500 ranked companies but fewer than 500 usable corporate domains. Discovery **preserves all 500 roster entries** and scans every usable homepage instead of discarding the entire list. Missing/invalid domains are explicitly reported in `career_discovery_report.json` under `fortune500_missing_companies`, with each company and rank. If the source itself is unavailable or lacks 500 ranked records, the workflow reports a discovery error rather than silently showing 0/500 as successful. Adding a company to the registry does not prove its jobs are integrated with the strict latest-only job report.
 
-### Rolling latest-48h results and Fortune data irregularities
+### Last-run filtering and Fortune data irregularities
 
-Unlike the old *since my last scan* logic, a verified role published within the last 48 hours remains visible on **every manual run** until it ages out. The SQLite scan checkpoint is still maintained for audit/history but does not hide otherwise-current jobs. Only postings still in the supported employer feeds and passing the public application-page check appear.
+The finder now compares each source's timestamp evidence with the previous completed manual scan. It does not replay a rolling 48-hour list. The Fortune registry loader tolerates duplicated source ranks and reports missing ranks without inventing companies. Employer links are checked before reporting.
 
-The Fortune 2026 CSV can contain duplicate or missing rank numbers. The importer keeps one entry per rank (preferring a row with a usable corporate domain) and scans all available distinct companies instead of discarding everything. The summary reports **distinct ranks loaded out of 500**, explicit missing rank numbers and entries without usable domains. A partial source is transparently reported as partial; missing company records are never invented.
