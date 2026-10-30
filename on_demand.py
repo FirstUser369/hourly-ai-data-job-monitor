@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
@@ -48,12 +48,35 @@ def identity(job, board):
     ).hexdigest()
 
 
-def assess_new(job, checkpoint, existing):
-    previous=parse_iso(existing[1]) if existing and existing[1] else None
-    if recent_employer_post(job,NOW,checkpoint,previous):
-        return "Employer-published in last 48 hours"
-    return None
+def source_time(job, checkpoint):
+    """Source proof must be STRICTLY between the previous and current runs."""
+    if checkpoint is None or checkpoint>=NOW: return None
+    ats=job.get("ats")
+    if ats in ("greenhouse","ashby","smartrecruiters"):
+        dt=parse_iso(job.get("published")); basis="Employer publication/release"
+    elif ats=="github_ml_tracker":
+        dt=parse_iso(job.get("published")); basis="GitHub tracker timestamp (unverified)"
+    elif ats=="himalayas":
+        dt=parse_iso(job.get("published")); basis="Himalayas updated time (NOT necessarily new)"
+    elif ats in ("jobicy","workingnomads","arbeitnow","remoteok"):
+        dt=parse_iso(job.get("published")); basis="Third-party posting time (unverified)"
+    elif ats=="github_applyguy":
+        try:
+            day=datetime.strptime(str(job.get("tracker_reported_posted")),"%Y-%m-%d").replace(tzinfo=timezone.utc)
+            dt=day if checkpoint<day and day+timedelta(days=1)<=NOW else None
+        except ValueError: dt=None
+        basis="GitHub date only (unverified)"
+    elif ats in ("github_zapply","github_simplify"):
+        age=job.get("github_reported_age_minutes")
+        if not isinstance(age,int) or age<0: return None
+        if timedelta(minutes=age+(1 if age<60 else 60))>NOW-checkpoint: return None
+        dt=NOW-timedelta(minutes=age); basis="GitHub approximate age (unverified)"
+    else: return None
+    return (dt,basis) if dt and checkpoint<dt<=NOW else None
 
+def assess_new(job,checkpoint,existing):
+    info=source_time(job,checkpoint)
+    return info[1] if info else None
 
 def safe_link(value):
     value = str(value or "")
