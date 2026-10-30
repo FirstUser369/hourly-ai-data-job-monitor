@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock
-from on_demand import assess_new, safe_link, NOW
+from on_demand import assess_new, source_time, safe_link, NOW
 from strict_jobs import recent_employer_post, verify_application
 
 class OnDemandTests(unittest.TestCase):
@@ -9,8 +9,8 @@ class OnDemandTests(unittest.TestCase):
         checkpoint=NOW-timedelta(hours=12)
         recent=NOW-timedelta(hours=1)
         job={"ats":"greenhouse","published":recent}
-        self.assertIn("Employer-published",assess_new(job,checkpoint,None))
-        self.assertIn("Employer-published",assess_new(job,checkpoint,("seen",recent.isoformat())))
+        self.assertIn("Employer publication",assess_new(job,checkpoint,None))
+        self.assertIn("Employer publication",assess_new(job,checkpoint,("seen",recent.isoformat())))
 
     def test_no_stale_jobs_even_if_never_discovered(self):
         old=NOW-timedelta(days=10)
