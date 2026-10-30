@@ -14,7 +14,7 @@ class OnDemandTests(unittest.TestCase):
 
     def test_no_stale_jobs_even_if_never_discovered(self):
         old=NOW-timedelta(days=10)
-        checkpoint=NOW-timedelta(days=15)
+        checkpoint=NOW-timedelta(days=3)
         self.assertIsNone(assess_new({"ats":"ashby","published":old},checkpoint,None))
         self.assertIsNone(assess_new({"ats":"greenhouse","published":NOW+timedelta(hours=1)},checkpoint,None))
 
