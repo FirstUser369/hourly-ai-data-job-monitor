@@ -128,7 +128,7 @@ def write_results(rows, checkpoint, source_label, report, failed):
                 rest.append(item)
         remaining=rest
     fields = ["company", "title", "location", "source", "published_utc", "first_seen_utc",
-              "score", "experience", "relevance", "status", "verification", "apply_url"]
+              "score", "experience", "relevance", "status", "freshness_class", "verification", "apply_url"]
     with (OUTPUT / "jobs_since_last_run.csv").open("w", newline="", encoding="utf-8-sig") as out:
         writer = csv.DictWriter(out, fieldnames=fields)
         writer.writeheader()
@@ -292,11 +292,14 @@ def main():
                     continue
                 seen.add(signature)
                 experience=next((label for label in str(job.get("relevance","")).split(", ") if label.startswith("experience")), "experience not specified")
+                freshness_class=("Employer timestamp" if job["ats"] in ("greenhouse","ashby","smartrecruiters")
+                                 else ("Updated only" if job["ats"]=="himalayas" else "Third-party reported"))
                 result.append({"company":job["company"],"title":job["title"],
                                "location":job.get("location",""),"source":job.get("source") or board["ats"],
                                "published_utc":monitor.iso(time_info[0]) if time_info else "",
                                "first_seen_utc":first_seen,"score":job.get("score",0),
                                "experience":experience,"relevance":job.get("relevance",""),"status":status,
+                               "freshness_class":freshness_class,
                                "verification":verification,"apply_url":url})
         total,published,discovered=write_results(result,checkpoint,checkpoint_basis,health,failed)
         logging.info("Expired, blocked or unverified applications excluded: %s", closed_or_unverified)
