@@ -15,7 +15,7 @@ def parse_jobicy(data):
         if not str(u).startswith("https://") or not j.get("jobTitle"):continue
         out.append(dict(ats="jobicy",id=str(j.get("id") or u),company=j.get("companyName") or "Unknown",
             title=j["jobTitle"],location=j.get("jobGeo") or "Remote",description=plain(j.get("jobDescription") or j.get("jobExcerpt")),
-            url=u,published=None,country=None,source="Jobicy",employer_direct=False))
+            url=u,published=j.get("pubDate") or j.get("date"),country=None,source="Jobicy",employer_direct=False))
     return out
 def jobicy(session,now=None):
     now=now or datetime.now(timezone.utc)
@@ -48,7 +48,7 @@ def parse_nomads(data):
         if not str(u).startswith("https://") or not j.get("title"):continue
         out.append(dict(ats="workingnomads",id=u,company=j.get("company_name") or "Unknown",
           title=j["title"],location=j.get("location") or "Remote",description=plain(j.get("description")),
-          url=u,published=None,country=None,source="Working Nomads",employer_direct=False))
+          url=u,published=j.get("pub_date") or j.get("date"),country=None,source="Working Nomads",employer_direct=False))
     return out
 def nomads(session):
     r=session.get("https://www.workingnomads.com/api/exposed_jobs/",timeout=(8,30));r.raise_for_status()
