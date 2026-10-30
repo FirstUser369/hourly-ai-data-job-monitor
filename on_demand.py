@@ -227,7 +227,7 @@ def main():
             if board["ats"]=="github_tracker":
                 found=fetch_watchlist(board["slug"],monitor.SESSION)
             elif board["ats"]=="jobicy":
-                found=jobicy(monitor.SESSION)
+                found=jobicy(monitor.SESSION,force_refresh=True)
             elif board["ats"]=="workingnomads":
                 found=nomads(monitor.SESSION)
             elif board["ats"]=="github_simplify":
