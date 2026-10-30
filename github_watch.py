@@ -48,7 +48,7 @@ def parse_zapply(markdown):
             ats="github_zapply", company=company, id=url, title=title,
             location=location, description="", url=url, published=None,
             source="zapplyjobs/New-Grad-Jobs-2027",
-            github_reported_age_minutes=minutes, freshness_kind="github_reported_age",
+            github_reported_age_minutes=minutes, reported_age=age, freshness_kind="github_reported_age",
             employer_direct=False, country=None))
     return results
 
