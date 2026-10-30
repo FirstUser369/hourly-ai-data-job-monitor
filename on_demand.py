@@ -153,7 +153,7 @@ def main():
         {"ats":"github_applyguy","slug":"newgrad2027","company":"ApplyGuy GitHub direct employer listings"},
     ]
     dedup={(b["ats"],b["slug"]):b for b in boards}
-    boards=[b for b in dedup.values() if b["ats"] in TRUSTED]
+    boards=list(dedup.values())
     if not boards:
         raise RuntimeError("No job sources configured")
 
