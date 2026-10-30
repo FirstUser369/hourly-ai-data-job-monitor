@@ -25,7 +25,7 @@ def remoteok(session):
         location=j.get('location') or 'Remote worldwide'
         yield dict(company=j.get('company','Unknown'),ats='remoteok',id=str(j['id']),title=j['position'],
             location=location,description=textify(j.get('description')),url=url,
-            published=None,updated=None,country=None,source='Remote OK',employer_direct=False)
+            published=j.get('date') or j.get('epoch'),updated=None,country=None,source='Remote OK',employer_direct=False)
 
 def himalayas(session):
     # Search several broad categories and multiple pages, not just exact titles.
@@ -53,7 +53,7 @@ def himalayas(session):
                 loc='Remote, United States' if not restrictions else 'Remote, '+ ', '.join(str(z) for z in restrictions[:5])
                 yield dict(company=j.get('companyName','Unknown'),ats='himalayas',id=uid,title=j.get('title',''),
                     location=loc,description=textify(j.get('description')),url=url,
-                    published=None,updated=None,country='US',source='Himalayas',employer_direct=False)
+                    published=j.get('pubDate'),expiry=j.get('expiryDate'),guid=uid,updated=None,country='US',source='Himalayas',employer_direct=False)
 
 
 def arbeitnow(session):
@@ -71,6 +71,6 @@ def arbeitnow(session):
             if not str(url).startswith('https://'):continue
             yield dict(company=j.get('company_name','Unknown'),ats='arbeitnow',id=uid,title=j.get('title',''),
               location=j.get('location') or ('Remote worldwide' if j.get('remote') else ''),
-              description=textify(j.get('description')),url=url,published=None,updated=None,country=None,
+              description=textify(j.get('description')),url=url,published=j.get('created_at'),updated=None,country=None,
               source='Arbeitnow',employer_direct=False)
         if not items:break

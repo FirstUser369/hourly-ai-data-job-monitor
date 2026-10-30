@@ -22,14 +22,31 @@ def recent_employer_post(job, now, checkpoint=None, existing_published=None):
     # Rolling 48h dashboard: previously seen but still current jobs stay visible.
     return True
 
-def verify_application(job,session=None):
+def verify_application(job,session=None,allow_aggregators=False):
     """Active public ATS presence plus reachable job-specific application page.
 
     Rejected when blocked or ambiguous: an HTTP 200 alone is insufficient if
     the destination is a generic company careers page or displays closed text.
     """
-    if job.get("ats") not in TRUSTED:
+    if job.get("ats") not in TRUSTED and not allow_aggregators:
         return False,"not employer ATS"
+    if job.get("ats")=="himalayas":
+        guid=str(job.get("guid") or "")
+        parsed=urlparse(guid)
+        if parsed.hostname not in ("himalayas.app","www.himalayas.app") or not parsed.path.startswith("/companies/"):
+            return False,"Himalayas detail identifier unavailable"
+        api="https://himalayas.app/jobs/api"+parsed.path
+        try:
+            client=session if session is not None else requests
+            response=client.get(api,timeout=(6,12))
+            if response.status_code!=200:
+                return False,"Himalayas API job not active: "+str(response.status_code)
+            data=response.json()
+            if not isinstance(data,dict) or not isinstance(data.get("job"),dict):
+                return False,"Himalayas API returned no current job"
+            return True,"Himalayas API active (application link not independently verified)"
+        except (requests.RequestException,ValueError,TypeError) as exc:
+            return False,"Himalayas status check failed: "+type(exc).__name__
     url=str(job.get("url") or "")
     parts=urlparse(url)
     if parts.scheme!="https" or not parts.hostname or parts.username or parts.password:

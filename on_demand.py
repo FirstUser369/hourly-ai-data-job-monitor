@@ -10,10 +10,11 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
+from email.utils import parsedate_to_datetime
 
 import yaml
 import monitor
@@ -28,7 +29,14 @@ MAX_SUMMARY_ROWS = 180
 
 
 def parse_iso(value):
-    return monitor.dateparse(value)
+    if isinstance(value,datetime):
+        return value.astimezone(timezone.utc) if value.tzinfo else None
+    dt=monitor.dateparse(value)
+    if dt: return dt
+    if isinstance(value,str):
+        try: return parsedate_to_datetime(value).astimezone(timezone.utc)
+        except (ValueError,TypeError,IndexError): return None
+    return None
 
 
 def previous_checkpoint(db):
@@ -48,12 +56,42 @@ def identity(job, board):
     ).hexdigest()
 
 
-def assess_new(job, checkpoint, existing):
-    previous=parse_iso(existing[1]) if existing and existing[1] else None
-    if recent_employer_post(job,NOW,checkpoint,previous):
-        return "Employer-published in last 48 hours"
-    return None
+def source_time(job, checkpoint):
+    """Source proof must be STRICTLY between the previous and current runs."""
+    if checkpoint is None or checkpoint>=NOW: return None
+    ats=job.get("ats")
+    if ats in ("greenhouse","ashby","smartrecruiters"):
+        dt=parse_iso(job.get("published")); basis="Employer publication/release"
+    elif ats=="lever":
+        dt=parse_iso(job.get("published")); basis="Lever posting created time (not necessarily public release)"
+    elif ats=="github_ml_tracker":
+        dt=parse_iso(job.get("published")); basis="GitHub tracker timestamp (unverified)"
+    elif ats=="himalayas":
+        dt=parse_iso(job.get("published")); basis="Himalayas updated time (NOT necessarily new)"
+    elif ats in ("jobicy","workingnomads","arbeitnow","remoteok"):
+        dt=parse_iso(job.get("published")); basis="Third-party posting time (unverified)"
+    elif ats=="github_applyguy":
+        try:
+            day=datetime.strptime(str(job.get("tracker_reported_posted")),"%Y-%m-%d").replace(tzinfo=timezone.utc)
+            dt=day if checkpoint<day and day+timedelta(days=1)<=NOW else None
+        except ValueError: dt=None
+        basis="GitHub date only (unverified)"
+    elif ats in ("github_zapply","github_simplify"):
+        age=job.get("github_reported_age_minutes")
+        if not isinstance(age,int) or age<0: return None
+        raw=str(job.get('reported_age') or '').lower()
+        margin=1440 if raw.endswith(('d','day','days')) else (10080 if raw.endswith(('w','wk','week','weeks')) else (60 if raw.endswith(('h','hr','hours')) else 1))
+        if timedelta(minutes=age+margin)>NOW-checkpoint: return None
+        dt=NOW-timedelta(minutes=age); basis="GitHub approximate age (unverified)"
+    else: return None
+    if ats=="himalayas":
+        expires=parse_iso(job.get("expiry"))
+        if expires and expires<=NOW: return None
+    return (dt,basis) if dt and checkpoint<dt<=NOW else None
 
+def assess_new(job,checkpoint,existing):
+    info=source_time(job,checkpoint)
+    return info[1] if info else None
 
 def safe_link(value):
     value = str(value or "")
@@ -74,8 +112,23 @@ def write_results(rows, checkpoint, source_label, report, failed):
            "experience not specified":1}
     rows.sort(key=lambda j: (tiers.get(j.get("experience"),0),
                              j["published_utc"], j["score"]), reverse=True)
+    # Round-robin the Summary across providers within each experience tier.
+    # The CSV/JSON retain ALL qualifying results; do not artificially cap a feed.
+    display_rows=[]
+    remaining=list(rows)
+    while remaining:
+        used_sources=set()
+        rest=[]
+        for item in remaining:
+            source=item["source"]
+            if source not in used_sources:
+                display_rows.append(item)
+                used_sources.add(source)
+            else:
+                rest.append(item)
+        remaining=rest
     fields = ["company", "title", "location", "source", "published_utc", "first_seen_utc",
-              "score", "experience", "relevance", "status", "verification", "apply_url"]
+              "score", "experience", "relevance", "status", "freshness_class", "verification", "apply_url"]
     with (OUTPUT / "jobs_since_last_run.csv").open("w", newline="", encoding="utf-8-sig") as out:
         writer = csv.DictWriter(out, fieldnames=fields)
         writer.writeheader()
@@ -85,33 +138,39 @@ def write_results(rows, checkpoint, source_label, report, failed):
         json.dumps({"scan_utc":monitor.iso(NOW), "previous_scan_utc":monitor.iso(checkpoint),
                     "checkpoint_basis":source_label, "results":rows, "feed_health":report},
                    indent=2, ensure_ascii=False), encoding="utf-8")
-    published=len(rows)
-    discovered=0
-    lines = [
-        "# Jobs found since your last run",
-        "",
+    published=sum(x["freshness_class"]=="Employer timestamp" for x in rows)
+    discovered=len(rows)-published
+    lines=[
+        "# Jobs found since your last run", "",
         f"**Scan:** {monitor.iso(NOW)} UTC",
         f"**Previous checkpoint:** {monitor.iso(checkpoint) or 'None'} ({source_label})",
-        f"**Results:** {len(rows)} live employer-posted jobs from the last 48 hours",
+        f"**Results:** {len(rows)} source-timed results ({published} direct employer timestamps; {discovered} other time signals)",
         f"**Feeds:** {len(report)-len(failed)}/{len(report)} succeeded",
-        "**Strict latest mode:** Only direct employer ATS postings with a real publication date in the last 48 hours and a reachable job-specific application page are shown.",
+        "**Strict interval:** A source timestamp or conservatively estimated tracker age must fall after the previous manual scan. New discovery by itself never qualifies.",
+        "Himalayas UPDATE timestamps are not evidence of a newly published job. Approximate GitHub and third-party times are labeled as unverified.",
+        "Application links or official source-status endpoints are checked where possible; blocked/uncertain links are omitted.",
         "",
-        "Old first-seen jobs and unverified third-party job boards are excluded. "
-        "A public ATS feed must currently list the role, and its job-specific application page must be reachable. "
-        "The full list, including application URLs, is in the CSV and JSON artifacts below this workflow run.",
-        "",
-        f"### Results (first {min(len(rows),MAX_SUMMARY_ROWS)} of {len(rows)})",
-        "",
-        "| Company | Role | Location | Experience | Published UTC | Verification | Apply |",
-        "|---|---|---|---|---|---|---|",
     ]
-    for row in rows[:MAX_SUMMARY_ROWS]:
-        url=safe_link(row["apply_url"])
-        link=f"[Open]({url})" if url else "Unavailable"
-        lines.append("| " + " | ".join([
-            safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
-            safe_cell(row["experience"]),safe_cell(row["published_utc"]),safe_cell(row["verification"]),link
-        ]) + " |")
+    groups=[
+        ("Employer timestamp","Employer ATS timestamps (highest confidence)"),
+        ("Third-party reported","Tracker/aggregator-reported recent postings (unverified)"),
+        ("Updated only","Himalayas recently updated listings (not confirmed newly posted)"),
+    ]
+    shown=0
+    for category,heading in groups:
+        group=[x for x in display_rows if x.get("freshness_class")==category]
+        if not group: continue
+        lines.extend([f"### {heading}: {len(group)}", "",
+                      "| Company | Role | Location | Experience | Source | Source time (UTC) | Evidence | Apply |",
+                      "|---|---|---|---|---|---|---|---|"])
+        for row in group[:max(0,MAX_SUMMARY_ROWS-shown)]:
+            link=safe_link(row["apply_url"])
+            lines.append("| "+" | ".join([
+                safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
+                safe_cell(row["experience"]),safe_cell(row["source"]),safe_cell(row["published_utc"]),
+                safe_cell(row["status"]),f"[Open]({link})" if link else "Unavailable"])+" |")
+            shown+=1
+        lines.append("")
     counts=Counter(row["source"] for row in rows)
     if counts:
         lines.extend(["", "### Where these results came from", "",
@@ -153,7 +212,7 @@ def main():
         {"ats":"github_applyguy","slug":"newgrad2027","company":"ApplyGuy GitHub direct employer listings"},
     ]
     dedup={(b["ats"],b["slug"]):b for b in boards}
-    boards=[b for b in dedup.values() if b["ats"] in TRUSTED]
+    boards=list(dedup.values())
     if not boards:
         raise RuntimeError("No job sources configured")
 
@@ -211,15 +270,16 @@ def main():
                 key=identity(job,board)
                 current=db.execute("SELECT first_seen,published FROM jobs WHERE key=?",(key,)).fetchone()
                 status=assess_new(job,checkpoint,current)
+                time_info=source_time(job,checkpoint)
                 verification=""
                 if status:
-                    valid,verification=verify_application(job)
+                    valid,verification=verify_application(job,allow_aggregators=True)
                     if not valid:
                         closed_or_unverified+=1
                         # Retry unverifiable applications next run; do not mark as seen.
                         continue
                 first_seen=current[0] if current else monitor.iso(NOW)
-                published=monitor.iso(job.get("published"))
+                published=monitor.iso(parse_iso(job.get("published")))
                 db.execute("""INSERT INTO jobs(key,company,title,location,url,published,first_seen,last_seen,alerted)
                     VALUES(?,?,?,?,?,?,?,?,0)
                     ON CONFLICT(key) DO UPDATE SET
@@ -238,27 +298,28 @@ def main():
                     continue
                 seen.add(signature)
                 experience=next((label for label in str(job.get("relevance","")).split(", ") if label.startswith("experience")), "experience not specified")
+                freshness_class=("Employer timestamp" if job["ats"] in ("greenhouse","ashby","smartrecruiters")
+                                 else ("Updated only" if job["ats"]=="himalayas" else "Third-party reported"))
                 result.append({"company":job["company"],"title":job["title"],
                                "location":job.get("location",""),"source":job.get("source") or board["ats"],
-                               "published_utc":published or "",
+                               "published_utc":monitor.iso(time_info[0]) if time_info else "",
                                "first_seen_utc":first_seen,"score":job.get("score",0),
                                "experience":experience,"relevance":job.get("relevance",""),"status":status,
+                               "freshness_class":freshness_class,
                                "verification":verification,"apply_url":url})
         total,published,discovered=write_results(result,checkpoint,checkpoint_basis,health,failed)
         logging.info("Expired, blocked or unverified applications excluded: %s", closed_or_unverified)
-        # If ANY feed fails, do not advance the global checkpoint: the next manual
-        # run can recover the missed published-time interval for that feed.
-        # Individual jobs are still persisted, and deduplication prevents repeats.
-        if not failed:
-            db.execute("INSERT INTO metadata(key,value) VALUES('manual_last_success',?) "
-                       "ON CONFLICT(key) DO UPDATE SET value=excluded.value",(monitor.iso(NOW),))
+        # Every completed job search is a new checkpoint, including partial scans.
+        # Failed source counts remain in feed_health.json and Summary.
+        db.execute("INSERT INTO metadata(key,value) VALUES('manual_last_success',?) "
+                   "ON CONFLICT(key) DO UPDATE SET value=excluded.value",(monitor.iso(NOW),))
         db.commit()
     finally:
         db.close()
     logging.info("Sources %s/%s OK; eligible=%s; results=%s; published=%s; discovered=%s",
                  len(health)-len(failed),len(health),eligible_count,total,published,discovered)
     if failed:
-        logging.warning("Some sources failed; checkpoint not advanced. Inspect feed_health.json.")
+        logging.warning("Some sources failed; checkpoint advanced for the completed scan. Inspect feed_health.json.")
     return 0
 
 if __name__=="__main__":
