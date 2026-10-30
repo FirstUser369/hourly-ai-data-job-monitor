@@ -151,7 +151,7 @@ def write_results(rows, checkpoint, source_label, report, failed):
         "",
         f"### Results (first {min(len(rows),MAX_SUMMARY_ROWS)} of {len(rows)})",
         "",
-        "| Company | Role | Location | Experience | Published UTC | Verification | Apply |",
+        "| Company | Role | Location | Experience | Source time UTC | Evidence | Apply |",
         "|---|---|---|---|---|---|---|",
     ]
     for row in display_rows[:MAX_SUMMARY_ROWS]:
@@ -159,7 +159,7 @@ def write_results(rows, checkpoint, source_label, report, failed):
         link=f"[Open]({url})" if url else "Unavailable"
         lines.append("| " + " | ".join([
             safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
-            safe_cell(row["experience"]),safe_cell(row["published_utc"]),safe_cell(row["verification"]),link
+            safe_cell(row["experience"]),safe_cell(row["published_utc"]),safe_cell(row["status"]),link
         ]) + " |")
     counts=Counter(row["source"] for row in rows)
     if counts:
