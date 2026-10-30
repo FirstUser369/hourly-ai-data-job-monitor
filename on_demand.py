@@ -236,7 +236,7 @@ def main():
                 status=assess_new(job,checkpoint,current)
                 verification=""
                 if status:
-                    valid,verification=verify_application(job)
+                    valid,verification=verify_application(job,allow_aggregators=True)
                     if not valid:
                         closed_or_unverified+=1
                         # Retry unverifiable applications next run; do not mark as seen.
