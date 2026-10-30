@@ -21,6 +21,7 @@ import monitor
 from github_watch import fetch_watchlist
 from wide_sources import jobicy, nomads, simplify, applyguy
 from strict_jobs import TRUSTED, recent_employer_post, verify_application
+from perm_history import load as load_perm_history, lookup as lookup_perm_history, OFFICIAL as PERM_SOURCE
 
 NOW = datetime.now(timezone.utc)
 OUTPUT = Path("job_results")
@@ -128,7 +129,9 @@ def write_results(rows, checkpoint, source_label, report, failed):
                 rest.append(item)
         remaining=rest
     fields = ["company", "title", "location", "source", "published_utc", "first_seen_utc",
-              "score", "experience", "relevance", "status", "freshness_class", "verification", "apply_url"]
+              "score", "experience", "relevance", "status", "freshness_class", "verification", "apply_url",
+              "perm_status", "perm_certified_3yr", "perm_cases_3yr", "perm_latest_determination",
+              "perm_matched_employer", "perm_source", "perm_data_through"]
     with (OUTPUT / "jobs_since_last_run.csv").open("w", newline="", encoding="utf-8-sig") as out:
         writer = csv.DictWriter(out, fieldnames=fields)
         writer.writeheader()
@@ -138,6 +141,7 @@ def write_results(rows, checkpoint, source_label, report, failed):
         json.dumps({"scan_utc":monitor.iso(NOW), "previous_scan_utc":monitor.iso(checkpoint),
                     "checkpoint_basis":source_label, "results":rows, "feed_health":report},
                    indent=2, ensure_ascii=False), encoding="utf-8")
+    perm_data=load_perm_history()
     published=sum(x["freshness_class"]=="Employer timestamp" for x in rows)
     discovered=len(rows)-published
     lines=[
@@ -146,6 +150,8 @@ def write_results(rows, checkpoint, source_label, report, failed):
         f"**Previous checkpoint:** {monitor.iso(checkpoint) or 'None'} ({source_label})",
         f"**Results:** {len(rows)} source-timed results ({published} direct employer timestamps; {discovered} other time signals)",
         f"**Feeds:** {len(report)-len(failed)}/{len(report)} succeeded",
+        ("**PERM enrichment:** Official DOL employer-level index last refreshed "+str(perm_data.get("generated_utc")) if perm_data else "**PERM enrichment:** No successful DOL index available; PERM status shown as Unknown"),
+        "**PERM is past labor-certification history, NOT confirmation that this opening offers green-card sponsorship. Matching is exact normalized employer name only; subsidiaries and alternate legal entities may show Unknown.**",
         "**Strict interval:** A source timestamp or conservatively estimated tracker age must fall after the previous manual scan. New discovery by itself never qualifies.",
         "Himalayas UPDATE timestamps are not evidence of a newly published job. Approximate GitHub and third-party times are labeled as unverified.",
         "Application links or official source-status endpoints are checked where possible; blocked/uncertain links are omitted.",
@@ -161,13 +167,14 @@ def write_results(rows, checkpoint, source_label, report, failed):
         group=[x for x in display_rows if x.get("freshness_class")==category]
         if not group: continue
         lines.extend([f"### {heading}: {len(group)}", "",
-                      "| Company | Role | Location | Experience | Source | Source time (UTC) | Evidence | Apply |",
-                      "|---|---|---|---|---|---|---|---|"])
+                      "| Company | Role | Location | Experience | PERM history | Certified cases (FY24–26) | Source | Source time (UTC) | Evidence | Apply |",
+                      "|---|---|---|---|---|---:|---|---|---|---|"])
         for row in group[:max(0,MAX_SUMMARY_ROWS-shown)]:
             link=safe_link(row["apply_url"])
             lines.append("| "+" | ".join([
                 safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
-                safe_cell(row["experience"]),safe_cell(row["source"]),safe_cell(row["published_utc"]),
+                safe_cell(row["experience"]),safe_cell(row["perm_status"]),str(row["perm_certified_3yr"]),
+                safe_cell(row["source"]),safe_cell(row["published_utc"]),
                 safe_cell(row["status"]),f"[Open]({link})" if link else "Unavailable"])+" |")
             shown+=1
         lines.append("")
@@ -254,6 +261,7 @@ def main():
     result=[]
     eligible_count=0
     closed_or_unverified=0
+    perm_index=load_perm_history()
     try:
         for board,jobs,error in fetched:
             if error:
@@ -300,7 +308,8 @@ def main():
                 experience=next((label for label in str(job.get("relevance","")).split(", ") if label.startswith("experience")), "experience not specified")
                 freshness_class=("Employer timestamp" if job["ats"] in ("greenhouse","ashby","smartrecruiters")
                                  else ("Updated only" if job["ats"]=="himalayas" else "Third-party reported"))
-                result.append({"company":job["company"],"title":job["title"],
+                result.append({**lookup_perm_history(job["company"],perm_index),
+                               "company":job["company"],"title":job["title"],
                                "location":job.get("location",""),"source":job.get("source") or board["ats"],
                                "published_utc":monitor.iso(time_info[0]) if time_info else "",
                                "first_seen_utc":first_seen,"score":job.get("score",0),
