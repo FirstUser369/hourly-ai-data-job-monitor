@@ -4,6 +4,7 @@ Refresh with: python perm_history.py refresh
 No H-1B inference; case determinations do not guarantee future sponsorship.
 """
 import argparse
+import gzip
 import json
 import re
 import tempfile
@@ -14,7 +15,7 @@ from urllib.parse import urlparse
 import requests
 from openpyxl import load_workbook
 
-INDEX=Path("perm_history_index.json")
+INDEX=Path("perm_history_index.json.gz")
 OFFICIAL="https://www.dol.gov/agencies/eta/foreign-labor/performance"
 SOURCES={
  "FY2024-old":"https://www.dol.gov/sites/dolgov/files/ETA/oflc/pdfs/PERM_Disclosure_Data_FY2024_Q4.xlsx",
@@ -126,7 +127,8 @@ def refresh(index=INDEX,session=None):
                 "years":[2024,2025,2026],"employers":employers}
             target=Path(index)
             temp_index=target.with_suffix(".tmp")
-            temp_index.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":")),encoding="utf-8")
+            with gzip.open(temp_index,"wt",encoding="utf-8") as out:
+                json.dump(payload,out,ensure_ascii=False,separators=(",",":"))
             temp_index.replace(target)
             print(f"Indexed {len(employers)} distinct PERM employer names from official DOL disclosures")
             return payload
@@ -138,7 +140,8 @@ def load(index=INDEX):
     path=Path(index)
     if not path.exists():return None
     try:
-        payload=json.loads(path.read_text(encoding="utf-8"))
+        with gzip.open(path,"rt",encoding="utf-8") as stream:
+            payload=json.load(stream)
         return payload if isinstance(payload.get("employers"),dict) else None
     except (OSError,ValueError,TypeError):return None
 
