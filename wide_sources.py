@@ -18,9 +18,9 @@ def parse_jobicy(data):
             title=j["jobTitle"],location=j.get("jobGeo") or "Remote",description=plain(j.get("jobDescription") or j.get("jobExcerpt")),
             url=u,published=j.get("pubDate") or j.get("date"),country=None,source="Jobicy",employer_direct=False))
     return out
-def jobicy(session,now=None):
+def jobicy(session,now=None,force_refresh=False):
     now=now or datetime.now(timezone.utc)
-    if CACHE.exists():
+    if CACHE.exists() and not force_refresh:
         try:
             c=json.loads(CACHE.read_text(encoding="utf-8"))
             previous=datetime.fromisoformat(c["fetched"])
