@@ -13,7 +13,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-from collections import Counter
+from collections import Counter, defaultdict
 from email.utils import parsedate_to_datetime
 
 import yaml
@@ -104,6 +104,34 @@ def safe_cell(value):
     return html.escape(str(value or "").replace("|", " ").replace("\n", " ").replace("\r", " "))
 
 
+
+def prefer_employer_sources(rows):
+    """Dedup after all sources have been assessed, favor direct ATS evidence."""
+    best={}
+    for row in rows:
+        signature=(re.sub(r"\W+","",str(row["company"]).lower()),
+                   re.sub(r"\W+","",str(row["title"]).lower()),
+                   re.sub(r"\W+","",str(row["location"]).lower()))
+        confidence={"Employer timestamp":3,"Third-party reported":2,"Updated only":1}
+        previous=best.get(signature)
+        if previous is None or (
+            confidence.get(row.get("freshness_class"),0),row.get("score",0),row.get("published_utc","")
+        ) > (
+            confidence.get(previous.get("freshness_class"),0),previous.get("score",0),previous.get("published_utc","")
+        ):
+            best[signature]=row
+    return list(best.values())
+
+
+def write_funnel(funnel,health):
+    items=[]
+    for entry in health:
+        key=entry["ats"]+"/"+entry["slug"]
+        items.append({"source":entry["company"],"key":key,"ok":entry["ok"],
+                      "error":entry.get("error"),**funnel[key]})
+    (OUTPUT/"source_funnel.json").write_text(json.dumps(items,indent=2),encoding="utf-8")
+    return items
+
 def write_results(rows, checkpoint, source_label, report, failed):
     # Experience preference takes precedence over recency and relevance score.
     tiers={"experience: 3–4 years (highest priority)":4,
@@ -171,6 +199,11 @@ def write_results(rows, checkpoint, source_label, report, failed):
                 safe_cell(row["status"]),f"[Open]({link})" if link else "Unavailable"])+" |")
             shown+=1
         lines.append("")
+    funnel_report=json.loads((OUTPUT/"source_funnel.json").read_text(encoding="utf-8")) if (OUTPUT/"source_funnel.json").exists() else []
+    if funnel_report:
+        lines.extend(["","### Source-by-source filtering audit","","| Source | Retrieved | Eligible | Time-qualified | Link-verified | Included | Status |","|---|---:|---:|---:|---:|---:|---|"])
+        for item in sorted(funnel_report,key=lambda x:(x["reported"],x["eligible"]),reverse=True):
+            lines.append("| "+" | ".join([safe_cell(item["source"]),str(item["fetched"]),str(item["eligible"]),str(item["time_matched"]),str(item["link_verified"]),str(item["reported"]),"OK" if item["ok"] else safe_cell(item.get("error") or "failed")])+" |")
     counts=Counter(row["source"] for row in rows)
     if counts:
         lines.extend(["", "### Where these results came from", "",
@@ -250,12 +283,14 @@ def main():
     (OUTPUT / "feed_health.json").write_text(json.dumps(health,indent=2),encoding="utf-8")
 
     db=monitor.connect()
-    seen=set()
     result=[]
+    funnel=defaultdict(lambda: {"fetched":0,"eligible":0,"time_matched":0,"link_verified":0,"reported":0,"dead_or_blocked":0})
     eligible_count=0
     closed_or_unverified=0
     try:
         for board,jobs,error in fetched:
+            source_key=board["ats"]+"/"+board["slug"]
+            funnel[source_key]["fetched"]=len(jobs)
             if error:
                 continue
             for job in jobs:
@@ -267,15 +302,18 @@ def main():
                 if not url:
                     continue
                 eligible_count+=1
+                funnel[source_key]["eligible"]+=1
                 key=identity(job,board)
                 current=db.execute("SELECT first_seen,published FROM jobs WHERE key=?",(key,)).fetchone()
                 status=assess_new(job,checkpoint,current)
                 time_info=source_time(job,checkpoint)
                 verification=""
                 if status:
+                    funnel[source_key]["time_matched"]+=1
                     valid,verification=verify_application(job,allow_aggregators=True)
                     if not valid:
                         closed_or_unverified+=1
+                        funnel[source_key]["dead_or_blocked"]+=1
                         # Retry unverifiable applications next run; do not mark as seen.
                         continue
                 first_seen=current[0] if current else monitor.iso(NOW)
@@ -290,23 +328,23 @@ def main():
                      url,published,first_seen,monitor.iso(NOW)))
                 if not status:
                     continue
-                # Within one run, suppress repeats of the same role across multiple providers.
-                signature=(re.sub(r"\W+","",str(job["company"]).lower()),
-                           re.sub(r"\W+","",str(job["title"]).lower()),
-                           re.sub(r"\W+","",str(job.get("location","")).lower()))
-                if signature in seen:
-                    continue
-                seen.add(signature)
+                funnel[source_key]["link_verified"]+=1
                 experience=next((label for label in str(job.get("relevance","")).split(", ") if label.startswith("experience")), "experience not specified")
                 freshness_class=("Employer timestamp" if job["ats"] in ("greenhouse","ashby","smartrecruiters")
                                  else ("Updated only" if job["ats"]=="himalayas" else "Third-party reported"))
-                result.append({"company":job["company"],"title":job["title"],
+                result.append({"_source_key":source_key,"company":job["company"],"title":job["title"],
                                "location":job.get("location",""),"source":job.get("source") or board["ats"],
                                "published_utc":monitor.iso(time_info[0]) if time_info else "",
                                "first_seen_utc":first_seen,"score":job.get("score",0),
                                "experience":experience,"relevance":job.get("relevance",""),"status":status,
                                "freshness_class":freshness_class,
                                "verification":verification,"apply_url":url})
+        result=prefer_employer_sources(result)
+        for item in result:
+            funnel[item["_source_key"]]["reported"]+=1
+        for item in result:
+            item.pop("_source_key",None)
+        write_funnel(funnel,health)
         total,published,discovered=write_results(result,checkpoint,checkpoint_basis,health,failed)
         logging.info("Expired, blocked or unverified applications excluded: %s", closed_or_unverified)
         # Every completed job search is a new checkpoint, including partial scans.
