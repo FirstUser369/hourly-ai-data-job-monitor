@@ -108,6 +108,21 @@ def write_results(rows, checkpoint, source_label, report, failed):
            "experience not specified":1}
     rows.sort(key=lambda j: (tiers.get(j.get("experience"),0),
                              j["published_utc"], j["score"]), reverse=True)
+    # Round-robin the Summary across providers within each experience tier.
+    # The CSV/JSON retain ALL qualifying results; do not artificially cap a feed.
+    display_rows=[]
+    remaining=list(rows)
+    while remaining:
+        used_sources=set()
+        rest=[]
+        for item in remaining:
+            source=item["source"]
+            if source not in used_sources:
+                display_rows.append(item)
+                used_sources.add(source)
+            else:
+                rest.append(item)
+        remaining=rest
     fields = ["company", "title", "location", "source", "published_utc", "first_seen_utc",
               "score", "experience", "relevance", "status", "verification", "apply_url"]
     with (OUTPUT / "jobs_since_last_run.csv").open("w", newline="", encoding="utf-8-sig") as out:
@@ -139,7 +154,7 @@ def write_results(rows, checkpoint, source_label, report, failed):
         "| Company | Role | Location | Experience | Published UTC | Verification | Apply |",
         "|---|---|---|---|---|---|---|",
     ]
-    for row in rows[:MAX_SUMMARY_ROWS]:
+    for row in display_rows[:MAX_SUMMARY_ROWS]:
         url=safe_link(row["apply_url"])
         link=f"[Open]({url})" if url else "Unavailable"
         lines.append("| " + " | ".join([
