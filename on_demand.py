@@ -80,6 +80,9 @@ def source_time(job, checkpoint):
         if timedelta(minutes=age+(1 if age<60 else 60))>NOW-checkpoint: return None
         dt=NOW-timedelta(minutes=age); basis="GitHub approximate age (unverified)"
     else: return None
+    if ats=="himalayas":
+        expires=parse_iso(job.get("expiry"))
+        if expires and expires<=NOW: return None
     return (dt,basis) if dt and checkpoint<dt<=NOW else None
 
 def assess_new(job,checkpoint,existing):
