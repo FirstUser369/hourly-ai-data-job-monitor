@@ -264,7 +264,7 @@ def main():
                 experience=next((label for label in str(job.get("relevance","")).split(", ") if label.startswith("experience")), "experience not specified")
                 result.append({"company":job["company"],"title":job["title"],
                                "location":job.get("location",""),"source":job.get("source") or board["ats"],
-                               "published_utc":published or "",
+                               "published_utc":monitor.iso(time_info[0]) if time_info else "",
                                "first_seen_utc":first_seen,"score":job.get("score",0),
                                "experience":experience,"relevance":job.get("relevance",""),"status":status,
                                "verification":verification,"apply_url":url})
