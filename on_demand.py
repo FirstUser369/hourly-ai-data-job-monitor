@@ -147,10 +147,10 @@ def write_results(rows, checkpoint, source_label, report, failed):
         f"**Previous checkpoint:** {monitor.iso(checkpoint) or 'None'} ({source_label})",
         f"**Results:** {len(rows)} postings or updates since previous scan",
         f"**Feeds:** {len(report)-len(failed)}/{len(report)} succeeded",
-        "**Strict latest mode:** Only direct employer ATS postings with a real publication date in the last 48 hours and a reachable job-specific application page are shown.",
+        "**Strict interval:** Only sources reporting times after the preceding run and no later than this scan can qualify. Newly discovered older jobs are excluded.",
         "",
-        "Old first-seen jobs and unverified third-party job boards are excluded. "
-        "A public ATS feed must currently list the role, and its job-specific application page must be reachable. "
+        "GitHub timestamps/ages are approximate and unverified; Himalayas pubDate indicates the latest UPDATE, not necessarily first publication. "
+        "Public application links or source status endpoints are checked where available. "
         "The full list, including application URLs, is in the CSV and JSON artifacts below this workflow run.",
         "",
         f"### Results (first {min(len(rows),MAX_SUMMARY_ROWS)} of {len(rows)})",
@@ -310,7 +310,7 @@ def main():
     logging.info("Sources %s/%s OK; eligible=%s; results=%s; published=%s; discovered=%s",
                  len(health)-len(failed),len(health),eligible_count,total,published,discovered)
     if failed:
-        logging.warning("Some sources failed; checkpoint not advanced. Inspect feed_health.json.")
+        logging.warning("Some sources failed; checkpoint advanced for the completed scan. Inspect feed_health.json.")
     return 0
 
 if __name__=="__main__":
