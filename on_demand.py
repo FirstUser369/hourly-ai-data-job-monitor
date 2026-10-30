@@ -138,33 +138,39 @@ def write_results(rows, checkpoint, source_label, report, failed):
         json.dumps({"scan_utc":monitor.iso(NOW), "previous_scan_utc":monitor.iso(checkpoint),
                     "checkpoint_basis":source_label, "results":rows, "feed_health":report},
                    indent=2, ensure_ascii=False), encoding="utf-8")
-    published=len(rows)
-    discovered=0
-    lines = [
-        "# Jobs found since your last run",
-        "",
+    published=sum(x["freshness_class"]=="Employer timestamp" for x in rows)
+    discovered=len(rows)-published
+    lines=[
+        "# Jobs found since your last run", "",
         f"**Scan:** {monitor.iso(NOW)} UTC",
         f"**Previous checkpoint:** {monitor.iso(checkpoint) or 'None'} ({source_label})",
-        f"**Results:** {len(rows)} postings or updates since previous scan",
+        f"**Results:** {len(rows)} source-timed results ({published} direct employer timestamps; {discovered} other time signals)",
         f"**Feeds:** {len(report)-len(failed)}/{len(report)} succeeded",
-        "**Strict interval:** Only sources reporting times after the preceding run and no later than this scan can qualify. Newly discovered older jobs are excluded.",
+        "**Strict interval:** A source timestamp or conservatively estimated tracker age must fall after the previous manual scan. New discovery by itself never qualifies.",
+        "Himalayas UPDATE timestamps are not evidence of a newly published job. Approximate GitHub and third-party times are labeled as unverified.",
+        "Application links or official source-status endpoints are checked where possible; blocked/uncertain links are omitted.",
         "",
-        "GitHub timestamps/ages are approximate and unverified; Himalayas pubDate indicates the latest UPDATE, not necessarily first publication. "
-        "Public application links or source status endpoints are checked where available. "
-        "The full list, including application URLs, is in the CSV and JSON artifacts below this workflow run.",
-        "",
-        f"### Results (first {min(len(rows),MAX_SUMMARY_ROWS)} of {len(rows)})",
-        "",
-        "| Company | Role | Location | Experience | Source time UTC | Evidence | Apply |",
-        "|---|---|---|---|---|---|---|",
     ]
-    for row in display_rows[:MAX_SUMMARY_ROWS]:
-        url=safe_link(row["apply_url"])
-        link=f"[Open]({url})" if url else "Unavailable"
-        lines.append("| " + " | ".join([
-            safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
-            safe_cell(row["experience"]),safe_cell(row["published_utc"]),safe_cell(row["status"]),link
-        ]) + " |")
+    groups=[
+        ("Employer timestamp","Employer ATS timestamps (highest confidence)"),
+        ("Third-party reported","Tracker/aggregator-reported recent postings (unverified)"),
+        ("Updated only","Himalayas recently updated listings (not confirmed newly posted)"),
+    ]
+    shown=0
+    for category,heading in groups:
+        group=[x for x in display_rows if x.get("freshness_class")==category]
+        if not group: continue
+        lines.extend([f"### {heading}: {len(group)}", "",
+                      "| Company | Role | Location | Experience | Source | Source time (UTC) | Evidence | Apply |",
+                      "|---|---|---|---|---|---|---|---|"])
+        for row in group[:max(0,MAX_SUMMARY_ROWS-shown)]:
+            link=safe_link(row["apply_url"])
+            lines.append("| "+" | ".join([
+                safe_cell(row["company"]),safe_cell(row["title"]),safe_cell(row["location"]),
+                safe_cell(row["experience"]),safe_cell(row["source"]),safe_cell(row["published_utc"]),
+                safe_cell(row["status"]),f"[Open]({link})" if link else "Unavailable"])+" |")
+            shown+=1
+        lines.append("")
     counts=Counter(row["source"] for row in rows)
     if counts:
         lines.extend(["", "### Where these results came from", "",
