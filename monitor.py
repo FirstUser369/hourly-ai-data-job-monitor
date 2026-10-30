@@ -53,7 +53,7 @@ def fetch(board):
         data = get(f'https://api.lever.co/v0/postings/{slug}?mode=json')
         for j in data:
             cat = j.get('categories') or {}
-            yield dict(company=company, ats=ats, id=str(j['id']), title=j['text'], location=', '.join([str(x) for x in (cat.get('allLocations') or [cat.get('location','')]) if x]), description=plain(j.get('descriptionPlain') or j.get('description')), url=j.get('applyUrl') or j.get('hostedUrl',''), published=None, updated=None, country=j.get('country'))
+            yield dict(company=company, ats=ats, id=str(j['id']), title=j['text'], location=', '.join([str(x) for x in (cat.get('allLocations') or [cat.get('location','')]) if x]), description=plain(j.get('descriptionPlain') or j.get('description')), url=j.get('applyUrl') or j.get('hostedUrl',''), published=dateparse(j.get('createdAt')), updated=dateparse(j.get('updatedAt')), country=j.get('country'))
     elif ats == 'ashby':
         data = get(f'https://api.ashbyhq.com/posting-api/job-board/{slug}')
         for j in data['jobs']:
