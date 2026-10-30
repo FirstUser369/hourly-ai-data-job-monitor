@@ -31,7 +31,7 @@ class OnDemandTests(unittest.TestCase):
         checkpoint=NOW-timedelta(minutes=80)
         self.assertIsNotNone(source_time({"ats":"github_zapply","github_reported_age_minutes":22},checkpoint))
         self.assertIsNone(source_time({"ats":"github_zapply","github_reported_age_minutes":80},checkpoint))
-        self.assertIsNone(source_time({"ats":"github_zapply","github_reported_age_minutes":60},checkpoint))
+        self.assertIsNone(source_time({"ats":"github_zapply","github_reported_age_minutes":60,"reported_age":"1h"},checkpoint))
         self.assertIsNone(source_time({"ats":"github_applyguy","tracker_reported_posted":NOW.strftime("%Y-%m-%d")},checkpoint))
 
     def test_himalayas_expiry_excludes_closed(self):
