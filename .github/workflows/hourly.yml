@@ -7,6 +7,11 @@ on:
         type: boolean
         required: false
         default: true
+      refresh_perm_history:
+        description: 'Refresh official DOL PERM employer history (otherwise use cached index)'
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -35,6 +40,16 @@ jobs:
         continue-on-error: true
         if: inputs.discover_career_pages == true
         run: python career_discovery.py
+      - name: Refresh official DOL PERM history when needed
+        id: perm
+        continue-on-error: true
+        if: inputs.refresh_perm_history == true || hashFiles('perm_history_index.json.gz') == ''
+        run: python perm_history.py refresh
+      - name: Report PERM download problem without blocking jobs
+        if: always() && steps.perm.outcome == 'failure'
+        run: |
+          echo '### PERM history refresh unavailable' >> "$GITHUB_STEP_SUMMARY"
+          echo 'DOL workbook download or parsing failed. Existing cached PERM data (if any) is used; otherwise all PERM values are Unknown.' >> "$GITHUB_STEP_SUMMARY"
       - name: Fetch jobs and show results in this run
         id: collect
         continue-on-error: true
@@ -47,6 +62,7 @@ jobs:
           path: |
             job_results/
             career_discovery_report.json
+            perm_history_index.json.gz
           if-no-files-found: warn
       - name: Save scan history
         if: always()
@@ -56,6 +72,7 @@ jobs:
           if [ -f jobs.sqlite3 ]; then git add -f jobs.sqlite3; fi
           if [ -f discovered_boards.yml ]; then git add -f discovered_boards.yml; fi
           if [ -f provider_cache/jobicy.json ]; then git add -f provider_cache/jobicy.json; fi
+          if [ -f perm_history_index.json.gz ]; then git add -f perm_history_index.json.gz; fi
           if ! git diff --cached --quiet; then
             git commit -m "Save manual job search history [skip ci]"
             git pull --rebase
