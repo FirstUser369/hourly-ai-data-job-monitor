@@ -115,7 +115,7 @@ def write_results(rows, checkpoint, source_label, report, failed):
         "",
         f"**Scan:** {monitor.iso(NOW)} UTC",
         f"**Previous checkpoint:** {monitor.iso(checkpoint) or 'None'} ({source_label})",
-        f"**Results:** {len(rows)} live employer-posted jobs from the last 48 hours",
+        f"**Results:** {len(rows)} postings or updates since previous scan",
         f"**Feeds:** {len(report)-len(failed)}/{len(report)} succeeded",
         "**Strict latest mode:** Only direct employer ATS postings with a real publication date in the last 48 hours and a reachable job-specific application page are shown.",
         "",
