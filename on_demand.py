@@ -269,7 +269,7 @@ def main():
                         # Retry unverifiable applications next run; do not mark as seen.
                         continue
                 first_seen=current[0] if current else monitor.iso(NOW)
-                published=monitor.iso(job.get("published"))
+                published=monitor.iso(parse_iso(job.get("published")))
                 db.execute("""INSERT INTO jobs(key,company,title,location,url,published,first_seen,last_seen,alerted)
                     VALUES(?,?,?,?,?,?,?,?,0)
                     ON CONFLICT(key) DO UPDATE SET
