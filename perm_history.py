@@ -80,11 +80,11 @@ def aggregate_batches(batches):
         year=re.search(r"FY(\d{4})",source)
         if not year:continue
         fiscal=year.group(1)
-        for name,status,case,determined in rows:
+        for row_number,(name,status,case,determined) in enumerate(rows):
             key=normalize(name)
             if not key:continue
             # DOL FY2024 has legacy and new-form files; avoid duplicate cases.
-            identity=(fiscal,case) if case else (fiscal,key,status,determined)
+            identity=(fiscal,case) if case else (source,row_number)
             if identity in seen:continue
             seen.add(identity)
             record=summary.setdefault(key,{"display_name":name,"determinations":0,
