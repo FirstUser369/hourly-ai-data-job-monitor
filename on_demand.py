@@ -270,12 +270,10 @@ def main():
                                "verification":verification,"apply_url":url})
         total,published,discovered=write_results(result,checkpoint,checkpoint_basis,health,failed)
         logging.info("Expired, blocked or unverified applications excluded: %s", closed_or_unverified)
-        # If ANY feed fails, do not advance the global checkpoint: the next manual
-        # run can recover the missed published-time interval for that feed.
-        # Individual jobs are still persisted, and deduplication prevents repeats.
-        if not failed:
-            db.execute("INSERT INTO metadata(key,value) VALUES('manual_last_success',?) "
-                       "ON CONFLICT(key) DO UPDATE SET value=excluded.value",(monitor.iso(NOW),))
+        # Every completed job search is a new checkpoint, including partial scans.
+        # Failed source counts remain in feed_health.json and Summary.
+        db.execute("INSERT INTO metadata(key,value) VALUES('manual_last_success',?) "
+                   "ON CONFLICT(key) DO UPDATE SET value=excluded.value",(monitor.iso(NOW),))
         db.commit()
     finally:
         db.close()
