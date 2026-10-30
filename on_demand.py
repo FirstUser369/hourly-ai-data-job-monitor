@@ -62,6 +62,8 @@ def source_time(job, checkpoint):
     ats=job.get("ats")
     if ats in ("greenhouse","ashby","smartrecruiters"):
         dt=parse_iso(job.get("published")); basis="Employer publication/release"
+    elif ats=="lever":
+        dt=parse_iso(job.get("published")); basis="Lever posting created time (not necessarily public release)"
     elif ats=="github_ml_tracker":
         dt=parse_iso(job.get("published")); basis="GitHub tracker timestamp (unverified)"
     elif ats=="himalayas":
