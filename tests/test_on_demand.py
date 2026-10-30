@@ -18,13 +18,28 @@ class OnDemandTests(unittest.TestCase):
         self.assertIsNone(assess_new({"ats":"ashby","published":old},checkpoint,None))
         self.assertIsNone(assess_new({"ats":"greenhouse","published":NOW+timedelta(hours=1)},checkpoint,None))
 
-    def test_aggregators_and_missing_timestamps_excluded(self):
-        checkpoint=NOW-timedelta(days=1)
-        for ats in ("himalayas","jobicy","github_tracker","github_applyguy",
-                    "github_simplify","workingnomads","remoteok","lever"):
+    def test_source_dates_must_be_since_previous_run(self):
+        checkpoint=NOW-timedelta(hours=3)
+        for ats in ("himalayas","jobicy","workingnomads","remoteok","arbeitnow",
+                    "github_ml_tracker","greenhouse","ashby"):
             with self.subTest(ats=ats):
-                self.assertIsNone(assess_new({"ats":ats,"published":NOW-timedelta(minutes=20)},checkpoint,None))
-        self.assertIsNone(assess_new({"ats":"greenhouse","published":None},checkpoint,None))
+                self.assertIsNotNone(source_time({"ats":ats,"published":NOW-timedelta(minutes=20)},checkpoint))
+                self.assertIsNone(source_time({"ats":ats,"published":NOW-timedelta(hours=4)},checkpoint))
+                self.assertIsNone(source_time({"ats":ats,"published":None},checkpoint))
+
+    def test_github_ages_and_unknown_dates(self):
+        checkpoint=NOW-timedelta(minutes=80)
+        self.assertIsNotNone(source_time({"ats":"github_zapply","github_reported_age_minutes":22},checkpoint))
+        self.assertIsNone(source_time({"ats":"github_zapply","github_reported_age_minutes":80},checkpoint))
+        self.assertIsNone(source_time({"ats":"github_zapply","github_reported_age_minutes":60},checkpoint))
+        self.assertIsNone(source_time({"ats":"github_applyguy","tracker_reported_posted":NOW.strftime("%Y-%m-%d")},checkpoint))
+
+    def test_himalayas_expiry_excludes_closed(self):
+        checkpoint=NOW-timedelta(hours=3)
+        job={"ats":"himalayas","published":NOW-timedelta(minutes=20),"expiry":NOW-timedelta(minutes=1)}
+        self.assertIsNone(source_time(job,checkpoint))
+        job["expiry"]=NOW+timedelta(hours=2)
+        self.assertIn("updated",source_time(job,checkpoint)[1])
 
     def test_strict_48_hour_cutoff(self):
         self.assertTrue(recent_employer_post({"ats":"ashby","published":NOW-timedelta(hours=47)},NOW))
