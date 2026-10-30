@@ -77,7 +77,9 @@ def source_time(job, checkpoint):
     elif ats in ("github_zapply","github_simplify"):
         age=job.get("github_reported_age_minutes")
         if not isinstance(age,int) or age<0: return None
-        if timedelta(minutes=age+(1 if age<60 else 60))>NOW-checkpoint: return None
+        raw=str(job.get('reported_age') or '').lower()
+        margin=1440 if raw.endswith(('d','day','days')) else (10080 if raw.endswith(('w','wk','week','weeks')) else (60 if raw.endswith(('h','hr','hours')) else 1))
+        if timedelta(minutes=age+margin)>NOW-checkpoint: return None
         dt=NOW-timedelta(minutes=age); basis="GitHub approximate age (unverified)"
     else: return None
     if ats=="himalayas":
