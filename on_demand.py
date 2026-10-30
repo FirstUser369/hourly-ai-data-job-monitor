@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
+from email.utils import parsedate_to_datetime
 
 import yaml
 import monitor
@@ -28,7 +29,14 @@ MAX_SUMMARY_ROWS = 180
 
 
 def parse_iso(value):
-    return monitor.dateparse(value)
+    if isinstance(value,datetime):
+        return value.astimezone(timezone.utc) if value.tzinfo else None
+    dt=monitor.dateparse(value)
+    if dt: return dt
+    if isinstance(value,str):
+        try: return parsedate_to_datetime(value).astimezone(timezone.utc)
+        except (ValueError,TypeError,IndexError): return None
+    return None
 
 
 def previous_checkpoint(db):
