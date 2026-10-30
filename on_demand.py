@@ -109,9 +109,9 @@ def prefer_employer_sources(rows):
     """Dedup after all sources have been assessed, favor direct ATS evidence."""
     best={}
     for row in rows:
-        signature=(re.sub(r"\\W+","",str(row["company"]).lower()),
-                   re.sub(r"\\W+","",str(row["title"]).lower()),
-                   re.sub(r"\\W+","",str(row["location"]).lower()))
+        signature=(re.sub(r"\W+","",str(row["company"]).lower()),
+                   re.sub(r"\W+","",str(row["title"]).lower()),
+                   re.sub(r"\W+","",str(row["location"]).lower()))
         confidence={"Employer timestamp":3,"Third-party reported":2,"Updated only":1}
         previous=best.get(signature)
         if previous is None or (
@@ -332,7 +332,7 @@ def main():
                 experience=next((label for label in str(job.get("relevance","")).split(", ") if label.startswith("experience")), "experience not specified")
                 freshness_class=("Employer timestamp" if job["ats"] in ("greenhouse","ashby","smartrecruiters")
                                  else ("Updated only" if job["ats"]=="himalayas" else "Third-party reported"))
-                result.append({"company":job["company"],"title":job["title"],
+                result.append({"_source_key":source_key,"company":job["company"],"title":job["title"],
                                "location":job.get("location",""),"source":job.get("source") or board["ats"],
                                "published_utc":monitor.iso(time_info[0]) if time_info else "",
                                "first_seen_utc":first_seen,"score":job.get("score",0),
