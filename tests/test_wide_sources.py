@@ -23,6 +23,16 @@ class WideSourcesTests(unittest.TestCase):
                 self.assertEqual(w.jobicy(session,datetime(2026,10,28,20,tzinfo=timezone.utc)),[])
             session.get.assert_not_called()
 
+    def test_manual_jobicy_force_refresh_skips_cache(self):
+        with TemporaryDirectory() as temp:
+            path=Path(temp)/"jobicy.json"
+            path.write_text('{"fetched":"2026-10-28T19:55:00+00:00","jobs":[]}')
+            session=Mock()
+            session.get.return_value.json.return_value={"success":True,"jobs":[]}
+            with patch.object(w,"CACHE",path):
+                self.assertEqual(w.jobicy(session,datetime(2026,10,28,20,tzinfo=timezone.utc),force_refresh=True),[])
+            session.get.assert_called_once()
+
     def test_applyguy_prefers_direct_employer_application(self):
         sample={"jobs":[{"id":"abc","company":"Example","title":"Data Engineer",
                  "location":"Boston, MA","posted":"2026-10-29",
