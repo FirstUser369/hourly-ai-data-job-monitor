@@ -234,6 +234,7 @@ def main():
                 key=identity(job,board)
                 current=db.execute("SELECT first_seen,published FROM jobs WHERE key=?",(key,)).fetchone()
                 status=assess_new(job,checkpoint,current)
+                time_info=source_time(job,checkpoint)
                 verification=""
                 if status:
                     valid,verification=verify_application(job,allow_aggregators=True)
