@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
+from github_watch import reported_minutes
 
 CACHE=Path("provider_cache/jobicy.json")
 def plain(x):return BeautifulSoup(str(x or ""),"html.parser").get_text(" ",strip=True)
@@ -70,7 +71,7 @@ def parse_simplify(raw):
         results.append(dict(ats="github_simplify",id=u,company=company,title=title,
            location=location,description="",url=u,published=None,country=None,
            source="SimplifyJobs/New-Grad-Positions",employer_direct=True,
-           reported_age=cells[4].get_text(" ",strip=True)))
+           reported_age=cells[4].get_text(" ",strip=True),github_reported_age_minutes=reported_minutes(cells[4].get_text(" ",strip=True))))
     return results
 def simplify(session):
     r=session.get("https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/README.md",timeout=(10,35))
