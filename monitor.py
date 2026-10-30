@@ -111,7 +111,7 @@ def fetch(board):
 def eligible(j):
     allowed, score, reasons = assess(j.get('title',''), j.get('description',''))
     j['score']=score
-    j['relevance']=', '.join(reasons[:4])
+    j['relevance']=', '.join(reasons)
     return allowed and us_eligible(j.get('location',''),j.get('country'))
 
 def connect():
