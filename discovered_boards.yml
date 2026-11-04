@@ -59,6 +59,9 @@ boards:
 - ats: greenhouse
   slug: reddit
   company: Reddit
+- ats: lever
+  slug: shieldai
+  company: Shield AI
 - ats: greenhouse
   slug: aechelontechnology
   company: Shield AI
@@ -89,9 +92,6 @@ boards:
 - ats: smartrecruiters
   slug: external-referrals
   company: Avery Dennison
-- ats: lever
-  slug: shieldai
-  company: Shield AI
 - ats: ashby
   slug: replit
   company: Replit
