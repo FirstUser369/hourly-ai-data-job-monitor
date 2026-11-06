@@ -44,6 +44,9 @@ boards:
 - ats: ashby
   slug: hume-ai
   company: Hume AI
+- ats: greenhouse
+  slug: descript
+  company: Descript
 - ats: ashby
   slug: pika
   company: Pika
@@ -59,12 +62,18 @@ boards:
 - ats: greenhouse
   slug: reddit
   company: Reddit
+- ats: lever
+  slug: shieldai
+  company: Shield AI
 - ats: greenhouse
   slug: aechelontechnology
   company: Shield AI
 - ats: ashby
   slug: applied
   company: Applied Intuition
+- ats: lever
+  slug: palantir
+  company: Palantir
 - ats: greenhouse
   slug: c3ascend
   company: C3 AI
@@ -86,12 +95,6 @@ boards:
 - ats: smartrecruiters
   slug: external-referrals
   company: Avery Dennison
-- ats: lever
-  slug: shieldai
-  company: Shield AI
-- ats: lever
-  slug: palantir
-  company: Palantir
 - ats: ashby
   slug: replit
   company: Replit
