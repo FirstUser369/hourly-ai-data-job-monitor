@@ -51,6 +51,9 @@ boards:
   slug: pika
   company: Pika
 - ats: greenhouse
+  slug: grafanalabs
+  company: Grafana Labs
+- ats: greenhouse
   slug: vercel
   company: Vercel
 - ats: greenhouse
