@@ -68,6 +68,9 @@ boards:
 - ats: lever
   slug: shieldai
   company: Shield AI
+- ats: ashby
+  slug: shield
+  company: Shield AI
 - ats: greenhouse
   slug: aechelontechnology
   company: Shield AI
