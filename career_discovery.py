@@ -274,7 +274,9 @@ def main():
             handle.write(f"- Public ATS feeds validated this run: **{newly_verified}**\n")
             handle.write(f"- Validated feeds retained in registry: **{len(confirmed)}**\n")
             handle.write(f"- Pages without visible public ATS: **{summary['no_public_ats_found']}**\n")
-            handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n\n")
+            handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n")
+            handle.write(f"- Failure categories: **{summary['failure_categories']}**\n")
+            handle.write(f"- ATS review queue: **{len(summary['review_queue'])} companies**\n\n")
             handle.write("For per-company statuses, download career_discovery_report.json in this run's artifact.\n")
     if fortune_error:
         raise RuntimeError("Fortune 500 registry import failed; see career_discovery_report.json: "+fortune_error)
