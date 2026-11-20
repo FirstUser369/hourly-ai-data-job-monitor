@@ -125,6 +125,39 @@ def fetch_page(session, url, timeout=(6,16)):
             time.sleep(1.5*(2**attempt))
     raise RuntimeError("retry loop exhausted")
 
+def classify_failure(err):
+    """Separate access restrictions, invalid URLs and transient failures."""
+    status=err.response.status_code if isinstance(err,requests.HTTPError) and err.response is not None else None
+    if status in (401,403,406):
+        category="access_restricted"
+    elif status==429:
+        category="rate_limited"
+    elif status in (400,404,410):
+        category="invalid_or_removed_url"
+    elif status is not None and status>=500:
+        category="server_error"
+    elif isinstance(err,requests.exceptions.SSLError):
+        category="tls_error"
+    elif isinstance(err,requests.Timeout):
+        category="timeout"
+    elif isinstance(err,requests.ConnectionError):
+        category="connection_error"
+    elif isinstance(err,(ValueError,TypeError)):
+        category="invalid_response"
+    else:
+        category="other_error"
+    return category,status
+
+
+def build_review_queue(pages):
+    """Human-review queue: never guess an employer's ATS identifier."""
+    return [{"company":p["company"],"url":p["url"],
+             "reason":p["failure_category"],"http_status":p.get("http_status"),
+             "action":"Find an official public ATS link and validate its API before adding"}
+            for p in pages if p.get("failure_category") in
+            ("access_restricted","invalid_or_removed_url","invalid_response","tls_error")]
+
+
 def inspect_page(record):
     company=str(record.get("company") or "").strip()
     url=str(record.get("url") or "").strip()
@@ -154,9 +187,10 @@ def inspect_page(record):
                          "potential_feeds":len(potential),"career_links_checked":len(targets),"verified_feed_count":len(verified)}
     except (requests.RequestException,ValueError,TypeError) as err:
         http_status=err.response.status_code if isinstance(err,requests.HTTPError) and err.response is not None else None
-        logging.warning("Career page %s: %s (HTTP %s)",company,type(err).__name__,http_status or "n/a")
+        category,http_status=classify_failure(err)
+        logging.warning("Career page %s: %s (HTTP %s; %s)",company,type(err).__name__,http_status or "n/a",category)
         return [],{"company":company,"url":url,"status":"failed","error":type(err).__name__,
-                   "http_status":http_status,"error_detail":str(err)[:250],
+                   "http_status":http_status,"failure_category":category,"error_detail":str(err)[:250],
                    "verified_feed_count":0}
     finally:
         session.close()
@@ -214,7 +248,18 @@ def main():
              "validated_boards_total":len(confirmed),
              "no_public_ats_found":sum(x["status"]=="no_public_ats_found" for x in report),
              "failed_pages":sum(x["status"]=="failed" for x in report),"pages":report}
+    summary["failure_categories"]={}
+    for item in report:
+        category=item.get("failure_category")
+        if category:
+            summary["failure_categories"][category]=summary["failure_categories"].get(category,0)+1
+    summary["review_queue"]=build_review_queue(report)
+    summary["missing_rank_review"]=[{"rank":rank,"reason":"Rank absent from upstream dataset; verify against authoritative roster"}
+                                     for rank in missing_ranks]
     Path("career_discovery_report.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
+    Path("career_discovery_review_queue.json").write_text(
+        json.dumps({"companies":summary["review_queue"],"missing_fortune_ranks":summary["missing_rank_review"]},indent=2),
+        encoding="utf-8")
     print("Fortune roster: %s/500 distinct ranks; %s missing ranks; %s missing/invalid domains" % (len(fortune),len(missing_ranks),len(missing_domains)))
     print("Career discovery: %s pages checked; %s verified ATS feeds found; %s total known; %s failed" %
           (len(report),newly_verified,len(confirmed),summary["failed_pages"]))
