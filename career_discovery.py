@@ -7,6 +7,7 @@ import json
 import os
 import logging
 import re
+import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
@@ -105,6 +106,25 @@ def career_links(html, origin):
             links.append(target)
     return links[:2]
 
+def fetch_page(session, url, timeout=(6,16)):
+    """Retry transient transport failures, 429 and 5xx responses only."""
+    for attempt in range(3):
+        try:
+            response=session.get(url,timeout=timeout,allow_redirects=True)
+            if response.status_code in (429,500,502,503,504) and attempt<2:
+                retry_after=response.headers.get("Retry-After","")
+                delay=float(retry_after) if retry_after.isdigit() else 1.5*(2**attempt)
+                time.sleep(min(delay,8))
+                response.close()
+                continue
+            response.raise_for_status()
+            return response
+        except (requests.Timeout,requests.ConnectionError):
+            if attempt==2:
+                raise
+            time.sleep(1.5*(2**attempt))
+    raise RuntimeError("retry loop exhausted")
+
 def inspect_page(record):
     company=str(record.get("company") or "").strip()
     url=str(record.get("url") or "").strip()
@@ -114,8 +134,7 @@ def inspect_page(record):
     session.headers["User-Agent"]=USER_AGENT
     try:
         # Independent sessions per worker; bound redirects/response size and request time.
-        resp=session.get(url,timeout=(6,16),allow_redirects=True)
-        resp.raise_for_status()
+        resp=fetch_page(session,url,timeout=(6,16))
         if not safe_url(resp.url):
             raise ValueError("unsafe redirect")
         if len(resp.content)>2_000_000:
@@ -124,8 +143,7 @@ def inspect_page(record):
         targets=career_links(resp.text,resp.url) if record.get("registry")=="fortune500_2026" else []
         for target in targets:
             try:
-                another=session.get(target,timeout=(5,12),allow_redirects=True)
-                another.raise_for_status()
+                another=fetch_page(session,target,timeout=(5,12))
                 if safe_url(another.url) and len(another.content)<=2_000_000:
                     potential.extend(parse_careers_html(another.text,another.url,company))
             except (requests.RequestException,ValueError):
@@ -135,8 +153,10 @@ def inspect_page(record):
         return verified,{"company":company,"url":url,"status":"verified_feed" if verified else "no_public_ats_found",
                          "potential_feeds":len(potential),"career_links_checked":len(targets),"verified_feed_count":len(verified)}
     except (requests.RequestException,ValueError,TypeError) as err:
-        logging.warning("Career page %s: %s",company,type(err).__name__)
+        http_status=err.response.status_code if isinstance(err,requests.HTTPError) and err.response is not None else None
+        logging.warning("Career page %s: %s (HTTP %s)",company,type(err).__name__,http_status or "n/a")
         return [],{"company":company,"url":url,"status":"failed","error":type(err).__name__,
+                   "http_status":http_status,"error_detail":str(err)[:250],
                    "verified_feed_count":0}
     finally:
         session.close()
