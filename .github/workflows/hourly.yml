@@ -47,6 +47,7 @@ jobs:
           path: |
             job_results/
             career_discovery_report.json
+            career_discovery_review_queue.json
           if-no-files-found: warn
       - name: Save scan history
         if: always()
