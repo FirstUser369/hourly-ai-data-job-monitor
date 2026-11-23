@@ -51,6 +51,9 @@ boards:
   slug: pika
   company: Pika
 - ats: greenhouse
+  slug: grafanalabs
+  company: Grafana Labs
+- ats: greenhouse
   slug: vercel
   company: Vercel
 - ats: greenhouse
@@ -98,9 +101,6 @@ boards:
 - ats: smartrecruiters
   slug: external-referrals
   company: Avery Dennison
-- ats: greenhouse
-  slug: grafanalabs
-  company: Grafana Labs
 - ats: ashby
   slug: replit
   company: Replit
