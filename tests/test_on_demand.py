@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock
-from on_demand import assess_new, source_time, safe_link, NOW
+from on_demand import assess_new, source_time, safe_link, NOW, prefer_employer_sources
 from strict_jobs import recent_employer_post, verify_application
 
 class OnDemandTests(unittest.TestCase):
@@ -63,6 +63,15 @@ class OnDemandTests(unittest.TestCase):
     def test_invalid_application_url(self):
         self.assertFalse(verify_application({"ats":"greenhouse","url":"javascript:alert(1)"})[0])
         self.assertFalse(verify_application({"ats":"github_tracker","url":"https://example.com/role"})[0])
+
+    def test_duplicates_prefer_employer_timestamp(self):
+        base={"company":"Acme","title":"Data Engineer","location":"Boston, MA",
+              "score":12,"published_utc":"2026-10-30T12:00:00+00:00"}
+        tracker={**base,"source":"Himalayas","freshness_class":"Updated only"}
+        employer={**base,"source":"Ashby","freshness_class":"Employer timestamp"}
+        chosen=prefer_employer_sources([tracker,employer])
+        self.assertEqual(len(chosen),1)
+        self.assertEqual(chosen[0]["source"],"Ashby")
 
     def test_link_safety(self):
         self.assertEqual(safe_link("https://example.org/apply"),"https://example.org/apply")

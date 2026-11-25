@@ -62,7 +62,7 @@ jobs:
           path: |
             job_results/
             career_discovery_report.json
-            perm_history_index.json.gz
+
           if-no-files-found: warn
       - name: Save scan history
         if: always()

@@ -7,6 +7,7 @@ import json
 import os
 import logging
 import re
+import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
@@ -105,6 +106,58 @@ def career_links(html, origin):
             links.append(target)
     return links[:2]
 
+def fetch_page(session, url, timeout=(6,16)):
+    """Retry transient transport failures, 429 and 5xx responses only."""
+    for attempt in range(3):
+        try:
+            response=session.get(url,timeout=timeout,allow_redirects=True)
+            if response.status_code in (429,500,502,503,504) and attempt<2:
+                retry_after=response.headers.get("Retry-After","")
+                delay=float(retry_after) if retry_after.isdigit() else 1.5*(2**attempt)
+                time.sleep(min(delay,8))
+                response.close()
+                continue
+            response.raise_for_status()
+            return response
+        except (requests.Timeout,requests.ConnectionError):
+            if attempt==2:
+                raise
+            time.sleep(1.5*(2**attempt))
+    raise RuntimeError("retry loop exhausted")
+
+def classify_failure(err):
+    """Separate access restrictions, invalid URLs and transient failures."""
+    status=err.response.status_code if isinstance(err,requests.HTTPError) and err.response is not None else None
+    if status in (401,403,406):
+        category="access_restricted"
+    elif status==429:
+        category="rate_limited"
+    elif status in (400,404,410):
+        category="invalid_or_removed_url"
+    elif status is not None and status>=500:
+        category="server_error"
+    elif isinstance(err,requests.exceptions.SSLError):
+        category="tls_error"
+    elif isinstance(err,requests.Timeout):
+        category="timeout"
+    elif isinstance(err,requests.ConnectionError):
+        category="connection_error"
+    elif isinstance(err,(ValueError,TypeError)):
+        category="invalid_response"
+    else:
+        category="other_error"
+    return category,status
+
+
+def build_review_queue(pages):
+    """Human-review queue: never guess an employer's ATS identifier."""
+    return [{"company":p["company"],"url":p["url"],
+             "reason":p["failure_category"],"http_status":p.get("http_status"),
+             "action":"Find an official public ATS link and validate its API before adding"}
+            for p in pages if p.get("failure_category") in
+            ("access_restricted","invalid_or_removed_url","invalid_response","tls_error")]
+
+
 def inspect_page(record):
     company=str(record.get("company") or "").strip()
     url=str(record.get("url") or "").strip()
@@ -114,8 +167,7 @@ def inspect_page(record):
     session.headers["User-Agent"]=USER_AGENT
     try:
         # Independent sessions per worker; bound redirects/response size and request time.
-        resp=session.get(url,timeout=(6,16),allow_redirects=True)
-        resp.raise_for_status()
+        resp=fetch_page(session,url,timeout=(6,16))
         if not safe_url(resp.url):
             raise ValueError("unsafe redirect")
         if len(resp.content)>2_000_000:
@@ -124,8 +176,7 @@ def inspect_page(record):
         targets=career_links(resp.text,resp.url) if record.get("registry")=="fortune500_2026" else []
         for target in targets:
             try:
-                another=session.get(target,timeout=(5,12),allow_redirects=True)
-                another.raise_for_status()
+                another=fetch_page(session,target,timeout=(5,12))
                 if safe_url(another.url) and len(another.content)<=2_000_000:
                     potential.extend(parse_careers_html(another.text,another.url,company))
             except (requests.RequestException,ValueError):
@@ -135,8 +186,11 @@ def inspect_page(record):
         return verified,{"company":company,"url":url,"status":"verified_feed" if verified else "no_public_ats_found",
                          "potential_feeds":len(potential),"career_links_checked":len(targets),"verified_feed_count":len(verified)}
     except (requests.RequestException,ValueError,TypeError) as err:
-        logging.warning("Career page %s: %s",company,type(err).__name__)
+        http_status=err.response.status_code if isinstance(err,requests.HTTPError) and err.response is not None else None
+        category,http_status=classify_failure(err)
+        logging.warning("Career page %s: %s (HTTP %s; %s)",company,type(err).__name__,http_status or "n/a",category)
         return [],{"company":company,"url":url,"status":"failed","error":type(err).__name__,
+                   "http_status":http_status,"failure_category":category,"error_detail":str(err)[:250],
                    "verified_feed_count":0}
     finally:
         session.close()
@@ -194,7 +248,18 @@ def main():
              "validated_boards_total":len(confirmed),
              "no_public_ats_found":sum(x["status"]=="no_public_ats_found" for x in report),
              "failed_pages":sum(x["status"]=="failed" for x in report),"pages":report}
+    summary["failure_categories"]={}
+    for item in report:
+        category=item.get("failure_category")
+        if category:
+            summary["failure_categories"][category]=summary["failure_categories"].get(category,0)+1
+    summary["review_queue"]=build_review_queue(report)
+    summary["missing_rank_review"]=[{"rank":rank,"reason":"Rank absent from upstream dataset; verify against authoritative roster"}
+                                     for rank in missing_ranks]
     Path("career_discovery_report.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
+    Path("career_discovery_review_queue.json").write_text(
+        json.dumps({"companies":summary["review_queue"],"missing_fortune_ranks":summary["missing_rank_review"]},indent=2),
+        encoding="utf-8")
     print("Fortune roster: %s/500 distinct ranks; %s missing ranks; %s missing/invalid domains" % (len(fortune),len(missing_ranks),len(missing_domains)))
     print("Career discovery: %s pages checked; %s verified ATS feeds found; %s total known; %s failed" %
           (len(report),newly_verified,len(confirmed),summary["failed_pages"]))
@@ -209,7 +274,9 @@ def main():
             handle.write(f"- Public ATS feeds validated this run: **{newly_verified}**\n")
             handle.write(f"- Validated feeds retained in registry: **{len(confirmed)}**\n")
             handle.write(f"- Pages without visible public ATS: **{summary['no_public_ats_found']}**\n")
-            handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n\n")
+            handle.write(f"- Failed career pages: **{summary['failed_pages']}**\n")
+            handle.write(f"- Failure categories: **{summary['failure_categories']}**\n")
+            handle.write(f"- ATS review queue: **{len(summary['review_queue'])} companies**\n\n")
             handle.write("For per-company statuses, download career_discovery_report.json in this run's artifact.\n")
     if fortune_error:
         raise RuntimeError("Fortune 500 registry import failed; see career_discovery_report.json: "+fortune_error)
