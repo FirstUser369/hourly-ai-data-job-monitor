@@ -74,3 +74,13 @@ The published 2026 Fortune 500 dataset can contain all 500 ranked companies but 
 
 The finder now compares each source's timestamp evidence with the previous completed manual scan. It does not replay a rolling 48-hour list. The Fortune registry loader tolerates duplicated source ranks and reports missing ranks without inventing companies. Employer links are checked before reporting.
 
+
+## PERM green-card labor-certification history (DOL official records)
+
+The job table and CSV/JSON now include employer-name-matched **PERM history** from the U.S. Department of Labor's Office of Foreign Labor Certification disclosure files. These are *past labor-certification case determinations*, not evidence that a particular open role offers green-card sponsorship. No matching records / uncertain subsidiary identity is shown as **Unknown**, never as "does not sponsor."
+
+Data: [DOL OFLC disclosure page](https://www.dol.gov/agencies/eta/foreign-labor/performance); FY2024 **both legacy and new-form** PERM files, FY2025 full-year PERM file, and FY2026 Q3 cumulative PERM file. FY2026 Q3 covers determinations through **June 30, 2026**; the index is not live immigration filing data. The refresh downloads the published official Excel files, reads employer name, case status, case number and determination date, removes duplicate case IDs, counts only `CERTIFIED` cases as certified, and writes a compressed aggregated employer-level index (`perm_history_index.json.gz`). It contains **no individual beneficiary records**. Company names are matched by an exact normalized form; alternate legal entities and subsidiaries are not inferred.
+
+**Manual Actions operation:** First scan automatically attempts to create the cached index when it is missing. Subsequent scans load it without redownloading large files. To update it, check **Refresh official DOL PERM employer history** in **Run workflow**. If DOL downloads fail or a workbook is malformed, the previously good index is preserved, or results show **Unknown** when no index exists. Check the Actions Summary for a refresh failure. The job scanner and its strict since-last-run freshness/source balance are unchanged.
+
+Columns: `perm_status`, `perm_certified_3yr`, `perm_cases_3yr`, `perm_latest_determination`, `perm_matched_employer`, `perm_source`, and `perm_data_through`. DOL disclosure counts represent determinations, not visa issuance, approved I-140s, or green cards. H-1B activity is **not** inferred from PERM records. Refreshed disclosure files are fiscal-year-specific and may lag new applications.
